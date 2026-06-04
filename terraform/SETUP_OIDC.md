@@ -45,20 +45,22 @@ terraform output -json | jq -r '.github_actions_terraform_role_arn.value'
 
 Go to your GitHub repository settings → Secrets and variables → Actions, and add:
 
-1. **AWS_TERRAFORM_ROLE_ARN**: The ARN from the previous step
-   ```
-   arn:aws:iam::<YOUR_ACCOUNT_ID>:role/project-bedrock-github-actions-terraform
-   ```
+#### Required Secrets (for Terraform workflow)
 
-2. **AWS_ROLE_ARN**: Same as above (used by artifacts workflow)
-   ```
-   arn:aws:iam::<YOUR_ACCOUNT_ID>:role/project-bedrock-github-actions-terraform
-   ```
+| Secret | Value | Purpose |
+|--------|-------|---------|
+| `AWS_TERRAFORM_ROLE_ARN` | `arn:aws:iam::<YOUR_ACCOUNT_ID>:role/project-bedrock-github-actions-terraform` | Allows Terraform workflow to authenticate with AWS via OIDC |
 
-3. **AWS_ECR_REPOSITORY**: Your ECR repository URI (for container images)
-   ```
-   public.ecr.xxx/your-repo
-   ```
+#### Optional Secrets (only for container image publishing)
+
+These secrets are only needed if you plan to build and publish Docker images to ECR:
+
+| Secret | Value | Purpose |
+|--------|-------|---------|
+| `AWS_ROLE_ARN` | Same as above | Used by "Publish Build" workflow for ECR access |
+| `AWS_ECR_REPOSITORY` | `public.ecr.xxx/your-repo` | ECR repository URI for container images |
+
+> **Note**: If you only need Terraform to work (not container builds), you only need to set `AWS_TERRAFORM_ROLE_ARN`.
 
 ### Step 4: Verify the Setup
 
@@ -89,14 +91,56 @@ This means the IAM role doesn't exist or the trust policy doesn't match. Verify:
 
 ### Error: "OIDC provider already exists"
 
-If you see this error during Terraform apply, the OIDC provider was already created. Update the variable:
+If you see this error during Terraform apply, the OIDC provider was already created in your AWS account. This is common if:
+- Another repository already set up GitHub OIDC
+- You ran the setup script before
+- The provider was created manually
+
+**Solution 1: Import the existing OIDC provider into Terraform state (Recommended)**
 
 ```bash
 # Get the existing provider ARN
-aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' --output text
+OIDC_ARN=$(aws iam list-open-id-connect-providers \
+  --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
+  --output text)
 
-# Update terraform.tfvars or pass as variable
-terraform apply -var="github_actions_oidc_provider_arn=<ARN_FROM_ABOVE>"
+echo "Found OIDC provider: $OIDC_ARN"
+
+# Import it into Terraform state
+cd terraform
+terraform import 'aws_iam_openid_connect_provider.github_actions[0]' "$OIDC_ARN"
+
+# Now run apply again
+terraform apply
+```
+
+**Solution 2: Set the variable to use the existing provider**
+
+```bash
+# Get the existing provider ARN
+OIDC_ARN=$(aws iam list-open-id-connect-providers \
+  --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
+  --output text)
+
+# Create terraform.tfvars with the existing provider
+cat > terraform.tfvars <<EOF
+github_actions_oidc_provider_arn = "$OIDC_ARN"
+github_actions_repository        = "esodevops/retail-store-sample-app"
+EOF
+
+# Run apply
+cd terraform
+terraform apply
+```
+
+**Solution 3: Skip OIDC provider creation entirely**
+
+If you want to use an existing OIDC provider without importing, set the variable in your terraform.tfvars:
+
+```hcl
+# terraform.tfvars
+github_actions_oidc_provider_arn = "arn:aws:iam::123456789:oidc-provider/token.actions.githubusercontent.com"
+github_actions_repository        = "esodevops/retail-store-sample-app"
 ```
 
 ### Checking the OIDC Subject Claims
