@@ -1,0 +1,52 @@
+# Terraform Variables Configuration
+# Copy this file to terraform.tfvars and update the values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Tags
+project_tag = "karatu-2025-capstone"
+
+# VPC Configuration
+vpc_name   = "project-bedrock-vpc"
+vpc_cidr   = "10.0.0.0/16"
+vpc_azs    = ["us-east-1a", "us-east-1b"]
+private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+# EKS Cluster Configuration
+cluster_name   = "project-bedrock-cluster"
+cluster_version = "1.34"
+
+# GitHub Actions OIDC Configuration
+# IMPORTANT: This must match your actual GitHub repository (owner/repo)
+github_actions_repository = "esodevops/retail-store-sample-app"
+
+# GitHub Actions Role Configuration
+github_actions_role_name = "project-bedrock-github-actions-terraform"
+
+# OIDC Provider ARN (leave empty to create a new one)
+# If you already have an OIDC provider for GitHub Actions, enter its ARN here
+github_actions_oidc_provider_arn = ""
+
+# S3 Bucket Configuration
+s3_bucket_name = "bedrock-assets-3765"
+
+# EKS State Bucket
+state_bucket_name = "project-bedrock-tfstate-3765"
+
+# IAM User Configuration
+iam_user_name = "bedrock-dev-view"
+
+# EKS Node Configuration
+eks_managed_node_groups = {
+  default = {
+    desired_size   = 2
+    max_size       = 3
+    min_size       = 1
+    instance_types = ["t3.medium"]
+    tags = {
+      Project = "karatu-2025-capstone"
+    }
+  }
+}

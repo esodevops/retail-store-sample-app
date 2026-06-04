@@ -192,7 +192,7 @@ variable "db_instance_class" {
 
 variable "github_actions_repository" {
   type    = string
-  default = "esodevops/retail-store-sample-app-test"
+  default = "esodevops/retail-store-sample-app"
 }
 
 variable "github_actions_role_name" {
