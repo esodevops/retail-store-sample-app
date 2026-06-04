@@ -71,6 +71,24 @@ manual_fallback_cleanup() {
 	aws iam delete-user-policy --user-name "$IAM_USER" --policy-name "${IAM_USER}-s3-put-object" >/dev/null 2>&1 || true
 	aws iam delete-user --user-name "$IAM_USER" >/dev/null 2>&1 || true
 
+	# IAM roles cleanup
+	aws iam delete-role-policy-attachment --role-name "${NAME_PREFIX}-carts-irsa" --policy-arn "$(aws iam list-attached-role-policies --role-name "${NAME_PREFIX}-carts-irsa" --query 'AttachedPolicies[0].PolicyArn' --output text 2>/dev/null)" >/dev/null 2>&1 || true
+	aws iam delete-role --role-name "${NAME_PREFIX}-carts-irsa" >/dev/null 2>&1 || true
+	aws iam delete-role --role-name "lambda_exec_role" >/dev/null 2>&1 || true
+
+	# IAM policies cleanup
+	IAM_POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='${NAME_PREFIX}-carts-dynamodb'].Arn | [0]" --output text 2>/dev/null || true)
+	if [[ -n "${IAM_POLICY_ARN:-}" && "${IAM_POLICY_ARN:-}" != "None" ]]; then
+		aws iam delete-policy --policy-arn "$IAM_POLICY_ARN" >/dev/null 2>&1 || true
+	fi
+
+	# GitHub Actions OIDC provider cleanup
+	aws iam delete-open-id-connect-provider --open-id-provider-arn "$(aws iam list-open-id-connect-providers --query 'OpenIDProviderList[].Arn' --output text 2>/dev/null | grep token.actions.githubusercontent.com)" >/dev/null 2>&1 || true
+
+	# IAM roles for GitHub Actions
+	aws iam detach-role-policy --role-name "${NAME_PREFIX}-github-actions-terraform" --policy-arn arn:aws:iam::aws:policy/AdministratorAccess >/dev/null 2>&1 || true
+	aws iam delete-role --role-name "${NAME_PREFIX}-github-actions-terraform" >/dev/null 2>&1 || true
+
 	echo "Fallback cleanup attempted. Some dependencies (for example ENIs/VPC) may still require manual deletion."
 }
 
@@ -136,10 +154,17 @@ report_leftovers() {
 
 # 1. Delete Kubernetes resources (namespace deletes all in it), only if cluster is reachable
 if kubectl version --short &>/dev/null; then
+	echo "Deleting retail Helm release (if present)..."
+	helm uninstall retail -n retail-app || true
+
 	echo "Deleting Kubernetes namespace retail-app..."
 	kubectl delete namespace retail-app --ignore-not-found
 
-	# 2. Delete Istio Helm releases (if present)
+	# 2. Delete AWS Load Balancer Controller (if present)
+	echo "Deleting AWS Load Balancer Controller (if present)..."
+	helm uninstall aws-load-balancer-controller -n kube-system || true
+
+	# 3. Delete Istio Helm releases (if present)
 	echo "Deleting Istio Helm releases (if present)..."
 	helm uninstall istio-ingress -n istio-ingress || true
 	helm uninstall istiod -n istio-system || true

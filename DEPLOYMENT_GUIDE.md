@@ -6,6 +6,14 @@
 - AWS account permissions for VPC, EKS, RDS, DynamoDB, IAM, S3, Lambda
 - GitHub secret `AWS_TERRAFORM_ROLE_ARN` for CI/CD OIDC
 
+If GitHub Actions fails with `Not authorized to perform sts:AssumeRoleWithWebIdentity`, the secret is usually pointing at a role that does not trust GitHub's OIDC provider. This stack now creates a dedicated role output for the Terraform workflow:
+
+```sh
+terraform -chdir=terraform output -raw github_actions_terraform_role_arn
+```
+
+Set that value as the repository secret `AWS_TERRAFORM_ROLE_ARN`. You can also reuse the same role for `AWS_ROLE_ARN` if you want the artifact publishing workflow to assume the same IAM role. If your AWS account already has the GitHub OIDC provider, set `github_actions_oidc_provider_arn` before apply so Terraform reuses it instead of creating a duplicate provider.
+
 ## 2. Provision Infrastructure (first time)
 
 The remote state bucket is managed by `module.state` in the main Terraform stack (same pattern as `modules/s3`, `modules/vpc`, etc.). Because Terraform cannot store state in S3 until that bucket exists, run this once:

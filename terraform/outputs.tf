@@ -29,3 +29,11 @@ output "bedrock_dev_view_console_password" {
   value     = module.iam.console_password
   sensitive = true
 }
+
+output "github_actions_terraform_role_arn" {
+  value = aws_iam_role.github_actions_terraform.arn
+}
+
+output "github_actions_role_arn" {
+  value = aws_iam_role.github_actions_terraform.arn
+}

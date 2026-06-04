@@ -189,3 +189,23 @@ variable "db_instance_class" {
   type    = string
   default = "db.t3.micro"
 }
+
+variable "github_actions_repository" {
+  type    = string
+  default = "esodevops/retail-store-sample-app-test"
+}
+
+variable "github_actions_role_name" {
+  type    = string
+  default = "project-bedrock-github-actions-terraform"
+}
+
+variable "github_actions_role_policy_arn" {
+  type    = string
+  default = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+variable "github_actions_oidc_provider_arn" {
+  type    = string
+  default = ""
+}
