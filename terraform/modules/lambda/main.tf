@@ -4,6 +4,11 @@ data "archive_file" "lambda_zip" {
   output_path = "${path.module}/lambda_function_payload.zip"
 }
 
+locals {
+  # If caller passed an ARN, extract the role name portion after 'role/'
+  lambda_role_name = contains(var.role_name, "arn:aws:iam::") ? regexreplace(var.role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.role_name
+}
+
 resource "aws_lambda_function" "asset_processor" {
   function_name    = var.function_name
   role             = aws_iam_role.lambda_exec.arn
@@ -15,7 +20,7 @@ resource "aws_lambda_function" "asset_processor" {
 }
 
 resource "aws_iam_role" "lambda_exec" {
-  name = var.role_name
+  name = local.lambda_role_name
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

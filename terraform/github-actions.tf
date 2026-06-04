@@ -2,6 +2,10 @@ data "tls_certificate" "github_actions" {
   url = "https://token.actions.githubusercontent.com"
 }
 
+locals {
+  github_actions_role_name_sanitized = contains(var.github_actions_role_name, "arn:aws:iam::") ? regexreplace(var.github_actions_role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.github_actions_role_name
+}
+
 resource "aws_iam_openid_connect_provider" "github_actions" {
   count = var.github_actions_oidc_provider_arn == "" ? 1 : 0
 
@@ -45,7 +49,7 @@ data "aws_iam_policy_document" "github_actions_terraform_assume_role" {
 }
 
 resource "aws_iam_role" "github_actions_terraform" {
-  name               = var.github_actions_role_name
+  name               = local.github_actions_role_name_sanitized
   assume_role_policy = data.aws_iam_policy_document.github_actions_terraform_assume_role.json
 
   tags = local.tags
