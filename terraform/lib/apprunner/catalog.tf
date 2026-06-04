@@ -122,7 +122,7 @@ data "aws_iam_policy_document" "catalog_db_secret" {
 
 resource "aws_iam_role_policy" "catalog_db_secret" {
   name   = "${var.environment_name}-catalog-db-secret"
-  role   = aws_iam_role.catalog.id
+  role   = aws_iam_role.catalog.name
   policy = data.aws_iam_policy_document.catalog_db_secret.json
 }
 

@@ -132,7 +132,7 @@ data "aws_iam_policy_document" "orders_db_secret" {
 
 resource "aws_iam_role_policy" "orders_db_secret" {
   name   = "${var.environment_name}-orders-db-secret"
-  role   = aws_iam_role.orders.id
+  role   = aws_iam_role.orders.name
   policy = data.aws_iam_policy_document.orders_db_secret.json
 }
 
