@@ -89,63 +89,88 @@ This means the IAM role doesn't exist or the trust policy doesn't match. Verify:
 
 3. The GitHub secret contains the correct ARN
 
-### Error: "OIDC provider already exists"
+### Error: "OIDC provider already exists" or "ResourceAlreadyExistsException"
 
-If you see this error during Terraform apply, the OIDC provider was already created in your AWS account. This is common if:
-- Another repository already set up GitHub OIDC
-- You ran the setup script before
-- The provider was created manually
+If you see errors about resources already existing (OIDC provider, CloudWatch Log Groups, etc.), it means your AWS account has infrastructure that was created previously but is not tracked by Terraform state. This is common when:
+- Infrastructure was created manually or by a previous setup
+- Terraform state was lost or you're running from a fresh clone
+- Another team member set up the infrastructure
 
-**Solution 1: Import the existing OIDC provider into Terraform state (Recommended)**
+**Solution 1: Use the Automated Import Script (Recommended)**
 
-This is the cleanest solution as it allows Terraform to manage the existing resource.
+We provide a script (`scripts/terraform-import-existing.sh`) that automatically discovers and imports all existing resources:
 
 ```bash
-# Step 1: Get the existing provider ARN
-OIDC_ARN=$(aws iam list-open-id-connect-providers \
-  --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
-  --output text)
+# Set your AWS credentials
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-east-1"
 
-echo "Found OIDC provider: $OIDC_ARN"
+# Run the import script
+bash scripts/terraform-import-existing.sh
 
-# Step 2: Navigate to terraform directory
+# After import completes, apply the configuration
 cd terraform
-
-# Step 3: Initialize Terraform (if not already done)
-terraform init -reconfigure
-
-# Step 4: Import the existing OIDC provider into Terraform state
-terraform import 'aws_iam_openid_connect_provider.github_actions[0]' "$OIDC_ARN"
-
-# Step 5: Now run apply - it will use the imported resource
 terraform apply
 ```
 
-**Solution 2: Set the variable to skip OIDC provider creation**
+This script will:
+- Import the existing OIDC provider for GitHub Actions
+- Import the GitHub Actions IAM role
+- Import the EKS cluster CloudWatch log groups
+- Import EKS addons
+- Import other existing AWS resources (S3, DynamoDB, IAM, Lambda, etc.)
+- Skip resources already tracked in Terraform state
 
-If you don't want to import the resource, you can tell Terraform to skip creating it by setting the `github_actions_oidc_provider_arn` variable to the existing provider's ARN:
+**Solution 2: Manual Import**
+
+If you prefer to import resources manually:
 
 ```bash
-# Step 1: Get the existing provider ARN
+cd terraform
+terraform init -reconfigure
+
+# 1. Import OIDC Provider
+OIDC_ARN=$(aws iam list-open-id-connect-providers \
+  --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
+  --output text)
+terraform import 'aws_iam_openid_connect_provider.github_actions[0]' "$OIDC_ARN"
+
+# 2. Import CloudWatch Log Group
+terraform import 'module.eks.module.eks.aws_cloudwatch_log_group.this[0]' "/aws/eks/project-bedrock-cluster/cluster"
+
+# 3. Import EKS Addons (repeat for each addon)
+terraform import 'module.eks.module.eks.aws_eks_addon.this["amazon-cloudwatch-observability"]' "project-bedrock-cluster/amazon-cloudwatch-observability"
+
+# 4. Import IAM Role (if exists)
+terraform import 'aws_iam_role.github_actions_terraform' "arn:aws:iam::YOUR_ACCOUNT_ID:role/project-bedrock-github-actions-terraform"
+
+# 5. Apply
+terraform apply
+```
+
+**Solution 3: Set variables to skip creating existing resources**
+
+If you don't want to import resources, you can tell Terraform to skip creating them:
+
+```bash
+# Get the existing OIDC provider ARN
 OIDC_ARN=$(aws iam list-open-id-connect-providers \
   --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
   --output text)
 
-echo "OIDC Provider ARN: $OIDC_ARN"
-
-# Step 2: Create terraform.tfvars with the existing provider
+# Create terraform.tfvars
 cat > terraform/terraform.tfvars <<EOF
 github_actions_oidc_provider_arn = "$OIDC_ARN"
 github_actions_repository        = "esodevops/retail-store-sample-app"
 EOF
 
-# Step 3: Run apply
 cd terraform
 terraform init -reconfigure
 terraform apply
 ```
 
-**Important**: With Solution 2, Terraform won't manage the OIDC provider resource. If you need to update it in the future, you'll need to manage it manually or import it later.
+**Important**: With Solution 3, Terraform won't manage those resources. This may cause issues if you need to update them later.
 
 ### Checking the OIDC Subject Claims
 

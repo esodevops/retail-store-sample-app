@@ -155,4 +155,36 @@ if [[ -n "${KMS_ALIAS_EXISTS:-}" ]]; then
     "alias/eks/${NAME_PREFIX}-cluster"
 fi
 
+# ---------- GitHub Actions OIDC Provider ----------
+OIDC_ARN=$(aws iam list-open-id-connect-providers \
+  --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
+  --output text 2>/dev/null || true)
+if [[ -n "${OIDC_ARN:-}" ]] && [[ "${OIDC_ARN}" != "None" ]]; then
+  tf_import "aws_iam_openid_connect_provider.github_actions[0]" "$OIDC_ARN"
+fi
+
+# ---------- GitHub Actions IAM Role ----------
+if aws iam get-role --role-name "project-bedrock-github-actions-terraform" >/dev/null 2>&1; then
+  tf_import "aws_iam_role.github_actions_terraform" \
+    "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/project-bedrock-github-actions-terraform"
+fi
+
+# ---------- CloudWatch Log Group for EKS Cluster ----------
+LOG_GROUP_NAME="/aws/eks/${NAME_PREFIX}-cluster/cluster"
+if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP_NAME" \
+     --region "$REGION" \
+     --query "logGroups[0].logGroupName" \
+     --output text 2>/dev/null | grep -q "$LOG_GROUP_NAME"; then
+  tf_import "module.eks.module.eks.aws_cloudwatch_log_group.this[0]" "$LOG_GROUP_NAME"
+fi
+
+# ---------- EKS Addons ----------
+for addon in $(aws eks list-addons --cluster-name "${NAME_PREFIX}-cluster" --region "$REGION" \
+     --query 'addons[*]' --output text 2>/dev/null || true); do
+  if [[ -n "${addon:-}" ]]; then
+    tf_import "module.eks.module.eks.aws_eks_addon.this[\"${addon}\"]" \
+      "${NAME_PREFIX}-cluster/${addon}"
+  fi
+done
+
 echo "=== Import step complete ==="
