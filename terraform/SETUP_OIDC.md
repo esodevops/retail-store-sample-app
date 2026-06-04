@@ -98,50 +98,54 @@ If you see this error during Terraform apply, the OIDC provider was already crea
 
 **Solution 1: Import the existing OIDC provider into Terraform state (Recommended)**
 
+This is the cleanest solution as it allows Terraform to manage the existing resource.
+
 ```bash
-# Get the existing provider ARN
+# Step 1: Get the existing provider ARN
 OIDC_ARN=$(aws iam list-open-id-connect-providers \
   --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
   --output text)
 
 echo "Found OIDC provider: $OIDC_ARN"
 
-# Import it into Terraform state
+# Step 2: Navigate to terraform directory
 cd terraform
+
+# Step 3: Initialize Terraform (if not already done)
+terraform init -reconfigure
+
+# Step 4: Import the existing OIDC provider into Terraform state
 terraform import 'aws_iam_openid_connect_provider.github_actions[0]' "$OIDC_ARN"
 
-# Now run apply again
+# Step 5: Now run apply - it will use the imported resource
 terraform apply
 ```
 
-**Solution 2: Set the variable to use the existing provider**
+**Solution 2: Set the variable to skip OIDC provider creation**
+
+If you don't want to import the resource, you can tell Terraform to skip creating it by setting the `github_actions_oidc_provider_arn` variable to the existing provider's ARN:
 
 ```bash
-# Get the existing provider ARN
+# Step 1: Get the existing provider ARN
 OIDC_ARN=$(aws iam list-open-id-connect-providers \
   --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' \
   --output text)
 
-# Create terraform.tfvars with the existing provider
-cat > terraform.tfvars <<EOF
+echo "OIDC Provider ARN: $OIDC_ARN"
+
+# Step 2: Create terraform.tfvars with the existing provider
+cat > terraform/terraform.tfvars <<EOF
 github_actions_oidc_provider_arn = "$OIDC_ARN"
 github_actions_repository        = "esodevops/retail-store-sample-app"
 EOF
 
-# Run apply
+# Step 3: Run apply
 cd terraform
+terraform init -reconfigure
 terraform apply
 ```
 
-**Solution 3: Skip OIDC provider creation entirely**
-
-If you want to use an existing OIDC provider without importing, set the variable in your terraform.tfvars:
-
-```hcl
-# terraform.tfvars
-github_actions_oidc_provider_arn = "arn:aws:iam::123456789:oidc-provider/token.actions.githubusercontent.com"
-github_actions_repository        = "esodevops/retail-store-sample-app"
-```
+**Important**: With Solution 2, Terraform won't manage the OIDC provider resource. If you need to update it in the future, you'll need to manage it manually or import it later.
 
 ### Checking the OIDC Subject Claims
 
