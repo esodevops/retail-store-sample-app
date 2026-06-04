@@ -6,7 +6,7 @@ data "archive_file" "lambda_zip" {
 
 locals {
   # If caller passed an ARN, extract the role name portion after 'role/'
-  lambda_role_name = contains(var.role_name, "arn:aws:iam::") ? regexreplace(var.role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.role_name
+  lambda_role_name = startswith(var.role_name, "arn:aws:iam::") ? regexreplace(var.role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.role_name
 }
 
 resource "aws_lambda_function" "asset_processor" {

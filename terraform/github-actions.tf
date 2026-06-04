@@ -3,7 +3,7 @@ data "tls_certificate" "github_actions" {
 }
 
 locals {
-  github_actions_role_name_sanitized = contains(var.github_actions_role_name, "arn:aws:iam::") ? regexreplace(var.github_actions_role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.github_actions_role_name
+  github_actions_role_name_sanitized = startswith(var.github_actions_role_name, "arn:aws:iam::") ? regexreplace(var.github_actions_role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.github_actions_role_name
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
