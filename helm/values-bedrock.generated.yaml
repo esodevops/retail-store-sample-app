@@ -1,0 +1,9 @@
+catalog:
+  app:
+    persistence:
+      endpoint: "project-bedrock-catalog-mysql.cczq4m6sy4gb.us-east-1.rds.amazonaws.com:3306"
+
+orders:
+  app:
+    persistence:
+      endpoint: "project-bedrock-orders-postgres.cczq4m6sy4gb.us-east-1.rds.amazonaws.com:5432"

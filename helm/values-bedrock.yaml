@@ -1,0 +1,70 @@
+cart:
+  fullnameOverride: carts
+  serviceAccount:
+    create: true
+    name: carts
+  app:
+    persistence:
+      provider: dynamodb
+      dynamodb:
+        tableName: retail-carts
+        createTable: false
+  dynamodb:
+    create: false
+
+catalog:
+  fullnameOverride: catalog
+  app:
+    persistence:
+      provider: mysql
+      endpoint: "<catalog-rds-endpoint>:3306"
+      database: catalog
+      secret:
+        create: false
+        name: catalog-db
+  mysql:
+    create: false
+
+checkout:
+  fullnameOverride: checkout
+  app:
+    persistence:
+      provider: redis
+      redis:
+        endpoint: "checkout-redis:6379"
+        tls: false
+    endpoints:
+      orders: http://orders:80
+  redis:
+    create: true
+
+orders:
+  fullnameOverride: orders
+  app:
+    persistence:
+      provider: postgres
+      endpoint: "<orders-rds-endpoint>:5432"
+      database: orders
+      secret:
+        create: false
+        name: orders-db
+    messaging:
+      provider: rabbitmq
+      rabbitmq:
+        addresses: []
+        secret:
+          create: false
+          name: orders-rabbitmq
+  postgresql:
+    create: false
+  rabbitmq:
+    create: true
+
+ui:
+  fullnameOverride: ui
+  app:
+    endpoints:
+      catalog: http://catalog:80
+      carts: http://carts:80
+      checkout: http://checkout:80
+      orders: http://orders:80

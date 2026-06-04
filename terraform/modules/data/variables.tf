@@ -1,0 +1,10 @@
+variable "name_prefix" { type = string }
+variable "vpc_id" { type = string }
+variable "private_subnet_ids" { type = list(string) }
+variable "eks_node_security_group_id" { type = string }
+variable "oidc_provider_arn" { type = string }
+variable "oidc_provider" { type = string }
+variable "app_namespace" { type = string }
+variable "dynamodb_table_name" { type = string }
+variable "db_instance_class" { type = string }
+variable "tags" { type = map(string) }

@@ -1,0 +1,12 @@
+variable "cluster_name" { type = string }
+variable "cluster_version" { type = string }
+variable "subnet_ids" { type = list(string) }
+variable "vpc_id" { type = string }
+variable "enable_irsa" { type = bool }
+variable "cluster_enabled_log_types" { type = list(string) }
+variable "cluster_addons" { type = any }
+variable "tags" { type = map(string) }
+variable "eks_managed_node_groups" { type = any }
+variable "cluster_endpoint_public_access" { type = bool }
+variable "cluster_endpoint_private_access" { type = bool }
+variable "cluster_endpoint_public_access_cidrs" { type = list(string) }
