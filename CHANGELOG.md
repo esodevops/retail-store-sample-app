@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.7.0](https://github.com/esodevops/retail-store-sample-app/compare/v1.6.0...v1.7.0) (2026-06-05)
+
+
+### Features
+
+* configure retail-app namespace for all deployment targets ([be9a905](https://github.com/esodevops/retail-store-sample-app/commit/be9a905e867f0e78154ec817df98d50e0343456e))
+* configure retail-app namespace for all deployment targets ([960507b](https://github.com/esodevops/retail-store-sample-app/commit/960507b1ec71ed6fbe0b213564c00a0739fca8c7))
+* deploy retail store infra ([510fec2](https://github.com/esodevops/retail-store-sample-app/commit/510fec2950fbaf4465c2db5a2558e51262dc5c4d))
+
+
+### Bug Fixes
+
+* accept role ARN or name and use role.name for IAM policy bindings ([124be98](https://github.com/esodevops/retail-store-sample-app/commit/124be98c9f5ef672ff03ab3470b5be59d075fe38))
+* accept role ARN or name for IAM role inputs ([3e6e8fe](https://github.com/esodevops/retail-store-sample-app/commit/3e6e8fe87134766ac9338d002ebada9b0033070b))
+* correct the OIDC for already existing role ([80995c2](https://github.com/esodevops/retail-store-sample-app/commit/80995c2fb6325444ccbbe813bf6d4a3e8acc31ed))
+* downgrade the ec2 instance type ([80f4e41](https://github.com/esodevops/retail-store-sample-app/commit/80f4e41fe7a64774b503fe51383c3c93fae23af3))
+* remove the grading.json from the pipeline ([3a734de](https://github.com/esodevops/retail-store-sample-app/commit/3a734def8fefd7a10d1c110134698ac07843a557))
+* resolve GitHub Actions OIDC authentication errors ([cb2dbf2](https://github.com/esodevops/retail-store-sample-app/commit/cb2dbf260da8c822387f9163d781410bc621188e))
+* sanitize IAM role names for Terraform resources ([d3452d1](https://github.com/esodevops/retail-store-sample-app/commit/d3452d1466eef9ae6d2d001fd231d75c4750e80e))
+* update helm chart and cleanup script ([8cca9f0](https://github.com/esodevops/retail-store-sample-app/commit/8cca9f0bbe3a1ff0bf2d86fe20ce9e1531570291))
+* update helm chart to take any aws profile for deployment ([a9cd4d8](https://github.com/esodevops/retail-store-sample-app/commit/a9cd4d8d39937d8d65659e8c1a0b2c09a65de13d))
+* update OIDC setup ([86e0a85](https://github.com/esodevops/retail-store-sample-app/commit/86e0a85877972d0f35de75d6fe4d486d234b9865))
+* update OIDC setup ([f01e9d7](https://github.com/esodevops/retail-store-sample-app/commit/f01e9d7e08337c59529801fc0ef7a028ee763dfb))
+* update terraform and cleanup script ([3f48850](https://github.com/esodevops/retail-store-sample-app/commit/3f48850bac835af135462290be17f5d329f8c602))
+* update the OIDC connection error ([c15a65d](https://github.com/esodevops/retail-store-sample-app/commit/c15a65d52dc497aba52b8cfd62934c94d874ea7a))
+
 ## [1.6.0](https://github.com/esodevops/retail-store-sample-app/compare/v1.5.0...v1.6.0) (2026-06-01)
 
 
