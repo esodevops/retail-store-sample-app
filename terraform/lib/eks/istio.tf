@@ -52,6 +52,16 @@ resource "kubernetes_namespace_v1" "istio_ingress" {
   }
 }
 
+resource "kubernetes_namespace_v1" "retail_app" {
+  metadata {
+    name = "retail-app"
+
+    labels = {
+      Project = "karatu-2025-capstone"
+    }
+  }
+}
+
 resource "helm_release" "istio_ingress" {
   count = var.istio_enabled ? 1 : 0
 
