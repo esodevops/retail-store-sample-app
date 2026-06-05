@@ -16,6 +16,10 @@ if [[ ! -f "${GENERATED_VALUES}" ]]; then
   exit 1
 fi
 
+# Update kubeconfig to use the current AWS profile (no hardcoded profile)
+echo "Updating kubeconfig for cluster ${CLUSTER_NAME} in region ${AWS_REGION}..."
+aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+
 CARTS_IRSA_ROLE_ARN="$(terraform -chdir=terraform output -raw carts_irsa_role_arn)"
 
 kubectl apply -f k8s/namespace.yaml
