@@ -1,6 +1,6 @@
 releases:
   - name: "catalog"
-    namespace: "default"
+    namespace: "retail-app"
     chart: ../catalog/chart
     wait: true
     values:
@@ -13,7 +13,7 @@ releases:
           create: true
 
   - name: "carts"
-    namespace: "default"
+    namespace: "retail-app"
     chart: ../cart/chart
     wait: true
     values:
@@ -26,7 +26,7 @@ releases:
           create: true
 
   - name: "orders"
-    namespace: "default"
+    namespace: "retail-app"
     chart: ../orders/chart
     wait: true
     values:
@@ -43,7 +43,7 @@ releases:
           create: true
 
   - name: "checkout"
-    namespace: "default"
+    namespace: "retail-app"
     chart: ../checkout/chart
     wait: true
     values:
@@ -58,7 +58,7 @@ releases:
           create: true
 
   - name: "ui"
-    namespace: "default"
+    namespace: "retail-app"
     chart: ../ui/chart
     wait: true
     timeout: 600
