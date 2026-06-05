@@ -164,9 +164,9 @@ if [[ -n "${OIDC_ARN:-}" ]] && [[ "${OIDC_ARN}" != "None" ]]; then
 fi
 
 # ---------- GitHub Actions IAM Role ----------
-if aws iam get-role --role-name "project-bedrock-github-actions-terraform" >/dev/null 2>&1; then
-  tf_import "aws_iam_role.github_actions_terraform" \
-    "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/project-bedrock-github-actions-terraform"
+GITHUB_ACTIONS_ROLE_NAME="project-bedrock-github-actions-terraform"
+if aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" >/dev/null 2>&1; then
+  tf_import "aws_iam_role.github_actions_terraform" "$GITHUB_ACTIONS_ROLE_NAME"
 fi
 
 # ---------- CloudWatch Log Group for EKS Cluster ----------
