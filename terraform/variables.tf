@@ -99,7 +99,10 @@ variable "eks_managed_node_groups" {
       desired_size   = 2
       max_size       = 3
       min_size       = 1
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
+      # Use use_name_prefix to give each instance a unique name based on count
+      use_name_prefix = true
+      name_prefix     = "project-bedrock-eks-node"
       tags = {
         Project = "karatu-2025-capstone"
       }
