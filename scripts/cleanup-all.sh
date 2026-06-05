@@ -83,7 +83,10 @@ manual_fallback_cleanup() {
 	fi
 
 	# GitHub Actions OIDC provider cleanup
-	aws iam delete-open-id-connect-provider --open-id-provider-arn "$(aws iam list-open-id-connect-providers --query 'OpenIDProviderList[].Arn' --output text 2>/dev/null | grep token.actions.githubusercontent.com)" >/dev/null 2>&1 || true
+	OIDC_ARN=$(aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' --output text 2>/dev/null || true)
+	if [[ -n "${OIDC_ARN:-}" && "${OIDC_ARN:-}" != "None" ]]; then
+		aws iam delete-open-id-connect-provider --open-id-provider-arn "$OIDC_ARN" >/dev/null 2>&1 || true
+	fi
 
 	# IAM roles for GitHub Actions
 	aws iam detach-role-policy --role-name "${NAME_PREFIX}-github-actions-terraform" --policy-arn arn:aws:iam::aws:policy/AdministratorAccess >/dev/null 2>&1 || true

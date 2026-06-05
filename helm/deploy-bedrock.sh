@@ -16,7 +16,43 @@ if [[ ! -f "${GENERATED_VALUES}" ]]; then
   exit 1
 fi
 
-# Update kubeconfig to use the current AWS profile (no hardcoded profile)
+# Configure AWS credentials for EKS access
+# The bedrock-dev-view user has cluster access configured by Terraform
+echo "Configuring AWS credentials for EKS access..."
+
+# Try to get bedrock-dev-view credentials from Terraform state using jq
+BEDROCK_ACCESS_KEY=""
+BEDROCK_SECRET_KEY=""
+
+if command -v jq &> /dev/null; then
+  # Use jq to properly parse the state file
+  TERRAFORM_STATE=$(terraform -chdir=terraform state show -json module.iam.aws_iam_access_key.dev_view 2>/dev/null || echo "")
+  if [[ -n "${TERRAFORM_STATE:-}" ]]; then
+    BEDROCK_ACCESS_KEY=$(echo "${TERRAFORM_STATE}" | jq -r '.values.access_key // empty' | tr -d '\n')
+    BEDROCK_SECRET_KEY=$(echo "${TERRAFORM_STATE}" | jq -r '.values.secret // empty' | tr -d '\n')
+  fi
+fi
+
+# Fallback: try grep if jq didn't work
+if [[ -z "${BEDROCK_ACCESS_KEY:-}" ]]; then
+  BEDROCK_ACCESS_KEY=$(terraform -chdir=terraform state show module.iam.aws_iam_access_key.dev_view 2>/dev/null | grep -E '^\s*access_key\s*=' | sed 's/.*=\s*"//' | sed 's/"$//' | tr -d '\n' || echo "")
+  BEDROCK_SECRET_KEY=$(terraform -chdir=terraform state show module.iam.aws_iam_access_key.dev_view 2>/dev/null | grep -E '^\s*secret\s*=' | sed 's/.*=\s*"//' | sed 's/"$//' | tr -d '\n' || echo "")
+fi
+
+if [[ -n "${BEDROCK_ACCESS_KEY:-}" ]] && [[ -n "${BEDROCK_SECRET_KEY:-}" ]]; then
+  echo "Using bedrock-dev-view credentials from Terraform state"
+  export AWS_ACCESS_KEY_ID="${BEDROCK_ACCESS_KEY}"
+  export AWS_SECRET_ACCESS_KEY="${BEDROCK_SECRET_KEY}"
+elif [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+  echo "Using AWS credentials from environment variables"
+else
+  echo "WARNING: No credentials found. Using current AWS profile."
+  echo "If authentication fails, you may need to:"
+  echo "  1. Set AWS_PROFILE to a profile with EKS cluster access, or"
+  echo "  2. Create a new access key: aws iam create-access-key --user-name bedrock-dev-view"
+fi
+
+# Update kubeconfig
 echo "Updating kubeconfig for cluster ${CLUSTER_NAME} in region ${AWS_REGION}..."
 aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
 
