@@ -47,15 +47,48 @@ if [ -z "$OIDC_PROVIDER_ARN" ]; then
     echo -e "${YELLOW}Creating OIDC provider...${NC}"
     
     # Get the thumbprint for GitHub's OIDC provider
+    # Use a more reliable method to get the thumbprint
     THUMBPRINT=$(echo | openssl s_client -servername token.actions.githubusercontent.com -connect token.actions.githubusercontent.com:443 2>/dev/null | openssl x509 -fingerprint -sha1 -noout | sed 's/SHA1 Fingerprint=//; s/://g' | tr '[:upper:]' '[:lower:]')
+    
+    # Remove any whitespace from thumbprint
+    THUMBPRINT=$(echo "$THUMBPRINT" | tr -d '[:space:]')
+    
+    echo -e "${YELLOW}Using thumbprint: ${THUMBPRINT}${NC}"
     
     # Create the OIDC provider
     OIDC_PROVIDER_ARN=$(aws iam create-open-id-connect-provider \
-        --url https://token.actions.githubusercontent.com \
-        --client-id-list sts.amazonaws.com \
+        --url "https://token.actions.githubusercontent.com" \
+        --client-id-list "sts.amazonaws.com" \
         --thumbprint-list "$THUMBPRINT" \
         --query 'Arn' \
-        --output text)
+        --output text 2>&1)
+    
+    # Check if the creation was successful
+    if [[ -z "$OIDC_PROVIDER_ARN" ]] || [[ "$OIDC_PROVIDER_ARN" == "None" ]]; then
+        echo -e "${RED}Error: Failed to create OIDC provider${NC}"
+        echo -e "${YELLOW}Trying alternative method with AWS CLI...${NC}"
+        
+        # Try using a well-known thumbprint for GitHub Actions
+        # GitHub's thumbprint can be found at: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
+        GITHUB_THUMBPRINT="6938fd4d98bab03faadb97b34396831e3780aea1"
+        
+        OIDC_PROVIDER_ARN=$(aws iam create-open-id-connect-provider \
+            --url "https://token.actions.githubusercontent.com" \
+            --client-id-list "sts.amazonaws.com" \
+            --thumbprint-list "$GITHUB_THUMBPRINT" \
+            --query 'Arn' \
+            --output text)
+    fi
+    
+    # Final check
+    if [[ -z "$OIDC_PROVIDER_ARN" ]] || [[ "$OIDC_PROVIDER_ARN" == "None" ]]; then
+        echo -e "${RED}Error: Could not create OIDC provider. Please create it manually.${NC}"
+        echo "  aws iam create-open-id-connect-provider \\"
+        echo "    --url https://token.actions.githubusercontent.com \\"
+        echo "    --client-id-list sts.amazonaws.com \\"
+        echo "    --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1"
+        exit 1
+    fi
     
     echo -e "${GREEN}OIDC Provider created: ${OIDC_PROVIDER_ARN}${NC}"
 else
