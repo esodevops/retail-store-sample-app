@@ -77,9 +77,4 @@ jobs:
         run: terraform apply -auto-approve
       - name: Generate Grading JSON
         run: bash scripts/generate-grading-json.sh
-      - name: Commit Grading JSON
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update grading.json after terraform apply"
-          file_pattern: grading.json
-          branch: main
+      
