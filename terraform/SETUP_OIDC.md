@@ -73,6 +73,50 @@ The workflow should now successfully assume the IAM role.
 
 ## Troubleshooting
 
+### Error: "No OpenIDConnect provider found in your account"
+
+This error occurs when the OIDC provider has **never been created** in your AWS account. GitHub Actions cannot authenticate without it.
+
+**Solution: Create the OIDC provider and IAM role first using AWS credentials**
+
+You must use AWS credentials (admin access) to create these resources before GitHub Actions can work. Choose one of these options:
+
+#### Option 1: Use the Setup Script (Easiest)
+
+```bash
+# Set your AWS credentials with admin access
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-east-1"
+
+# Run the setup script to create OIDC provider and IAM role
+bash scripts/setup-github-oidc.sh
+
+# Copy the role ARN from the output and add it to GitHub secrets
+```
+
+#### Option 2: Use Terraform
+
+```bash
+# Set your AWS credentials with admin access
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-east-1"
+
+cd terraform
+terraform init -reconfigure
+
+# Create only the OIDC provider and IAM role
+terraform apply -target=aws_iam_openid_connect_provider.github_actions -target=aws_iam_role.github_actions_terraform -target=aws_iam_role_policy_attachment.github_actions_terraform
+
+# Get the role ARN
+terraform output -json | jq -r '.github_actions_terraform_role_arn.value'
+```
+
+#### Option 3: Create Manually with AWS CLI
+
+See the "Manual Role Creation" section at the end of this document.
+
 ### Error: "Not authorized to perform sts:AssumeRoleWithWebIdentity"
 
 This means the IAM role doesn't exist or the trust policy doesn't match. Verify:
