@@ -11,13 +11,23 @@ GENERATED_VALUES="${GENERATED_VALUES:-helm/values-bedrock.generated.yaml}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# Load environment variables from .env file if it exists (for local deployment)
+if [[ -f ".env" ]]; then
+    echo "Loading environment variables from .env..."
+    set -a
+    source .env
+    set +a
+fi
+
 if [[ ! -f "${GENERATED_VALUES}" ]]; then
   echo "Missing ${GENERATED_VALUES}. Run ./scripts/sync-retail-secrets.sh first."
   exit 1
 fi
 
 # Configure AWS credentials for EKS access
-# The bedrock-dev-view user has cluster access configured by Terraform
+# Priority: 1. Environment variables (from .env or set manually)
+#            2. bedrock-dev-view credentials from Terraform state
+#            3. AWS_PROFILE
 echo "Configuring AWS credentials for EKS access..."
 
 # Try to get bedrock-dev-view credentials from Terraform state using jq
@@ -45,11 +55,22 @@ if [[ -n "${BEDROCK_ACCESS_KEY:-}" ]] && [[ -n "${BEDROCK_SECRET_KEY:-}" ]]; the
   export AWS_SECRET_ACCESS_KEY="${BEDROCK_SECRET_KEY}"
 elif [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
   echo "Using AWS credentials from environment variables"
+elif [[ -n "${AWS_PROFILE:-}" ]]; then
+  echo "Using AWS profile: ${AWS_PROFILE}"
 else
-  echo "WARNING: No credentials found. Using current AWS profile."
-  echo "If authentication fails, you may need to:"
-  echo "  1. Set AWS_PROFILE to a profile with EKS cluster access, or"
-  echo "  2. Create a new access key: aws iam create-access-key --user-name bedrock-dev-view"
+  echo "WARNING: No credentials found."
+  echo ""
+  echo "Please set up AWS credentials before deploying:"
+  echo "  Option 1: Set AWS_PROFILE to a profile with EKS cluster access"
+  echo "    export AWS_PROFILE=sulaimon"
+  echo "  Option 2: Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
+  echo "  Option 3: Deploy infrastructure first with Terraform to create bedrock-dev-view user"
+  echo "    cd terraform && terraform apply"
+  echo ""
+  echo "For grading, use the bedrock-dev-view user credentials from Terraform outputs:"
+  echo "  terraform -chdir=terraform output bedrock_dev_view_access_key_id"
+  echo "  terraform -chdir=terraform output -raw bedrock_dev_view_secret_access_key"
+  exit 1
 fi
 
 # Update kubeconfig
