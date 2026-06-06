@@ -67,39 +67,9 @@ resource "aws_eks_access_policy_association" "bedrock_dev_view_policy" {
   }
 }
 
-# Grant admin access to the deploying user/role (whoever runs terraform apply)
-data "aws_caller_identity" "current" {}
-data "aws_iam_session_context" "current" {
-  arn = data.aws_caller_identity.current.arn
-}
-
-locals {
-  # Get the IAM role ARN if assuming a role, otherwise use the user ARN
-  deployer_principal_arn = try(
-    data.aws_iam_session_context.current.issuer_arn,
-    data.aws_caller_identity.current.arn
-  )
-}
-
-# Grant admin access to the deploying user/role (whoever runs terraform apply)
-# Skip creation if the access entry already exists (e.g., when running as the same user)
-resource "aws_eks_access_entry" "deployer" {
-  count         = local.deployer_principal_arn != module.iam.user_arn ? 1 : 0
-  cluster_name  = module.eks.cluster_name
-  principal_arn = local.deployer_principal_arn
-  type          = "STANDARD"
-}
-
-resource "aws_eks_access_policy_association" "deployer_admin_policy" {
-  count         = local.deployer_principal_arn != module.iam.user_arn ? 1 : 0
-  cluster_name  = module.eks.cluster_name
-  principal_arn = local.deployer_principal_arn
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-
-  access_scope {
-    type = "cluster"
-  }
-}
+# Note: The EKS module already has enable_cluster_creator_admin_permissions = true
+# which grants admin access to the cluster creator automatically.
+# No need to create additional access entries for the deployer.
 
 module "data" {
   source                     = "./modules/data"
