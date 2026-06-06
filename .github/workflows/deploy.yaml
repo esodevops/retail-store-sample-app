@@ -143,10 +143,10 @@ jobs:
           
           # Wait for ingress to be available
           echo "Waiting for LoadBalancer to be provisioned..."
-          kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' ingress/ui -n retail-app --timeout=300s
+          kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' ingress/retail-ui-ingress -n retail-app --timeout=300s
           
           # Get the ingress URL
-          INGRESS_URL=$(kubectl get ingress ui -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          INGRESS_URL=$(kubectl get ingress retail-ui-ingress -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           echo "url=http://${INGRESS_URL}" >> $GITHUB_OUTPUT
           echo "Application deployed to: http://${INGRESS_URL}"
 
