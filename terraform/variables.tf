@@ -104,6 +104,9 @@ variable "eks_managed_node_groups" {
       name            = "project-bedrock-server-1"
       use_name_prefix = true
       iam_role_name   = "project-bedrock-server-1-ng-role"
+      iam_role_additional_policies = {
+        CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      }
       tags = {
         Name    = "project-bedrock-server-1"
         Project = "karatu-2025-capstone"
@@ -118,6 +121,9 @@ variable "eks_managed_node_groups" {
       name            = "project-bedrock-server-2"
       use_name_prefix = true
       iam_role_name   = "project-bedrock-server-2-ng-role"
+      iam_role_additional_policies = {
+        CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      }
       tags = {
         Name    = "project-bedrock-server-2"
         Project = "karatu-2025-capstone"
