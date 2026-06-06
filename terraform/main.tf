@@ -81,13 +81,17 @@ locals {
   )
 }
 
+# Grant admin access to the deploying user/role (whoever runs terraform apply)
+# Skip creation if the access entry already exists (e.g., when running as the same user)
 resource "aws_eks_access_entry" "deployer" {
+  count         = local.deployer_principal_arn != module.iam.user_arn ? 1 : 0
   cluster_name  = module.eks.cluster_name
   principal_arn = local.deployer_principal_arn
   type          = "STANDARD"
 }
 
 resource "aws_eks_access_policy_association" "deployer_admin_policy" {
+  count         = local.deployer_principal_arn != module.iam.user_arn ? 1 : 0
   cluster_name  = module.eks.cluster_name
   principal_arn = local.deployer_principal_arn
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
