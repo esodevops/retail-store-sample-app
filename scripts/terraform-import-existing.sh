@@ -250,21 +250,21 @@ if [[ -n "${OIDC_ARN:-}" ]] && [[ "${OIDC_ARN}" != "None" ]]; then
 fi
 
 # ---------- GitHub Actions IAM Role ----------
-GITHUB_ACTIONS_ROLE_NAME="project-bedrock-github-actions-terraform"
+GITHUB_ACTIONS_ROLE_NAME="${GITHUB_ACTIONS_ROLE_NAME:-project-bedrock-github-actions-terraform}"
+if [[ -n "${AWS_TERRAFORM_ROLE_ARN:-}" ]]; then
+  GITHUB_ACTIONS_ROLE_NAME="${AWS_TERRAFORM_ROLE_ARN##*/}"
+fi
+
 if aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" >/dev/null 2>&1; then
   tf_import "aws_iam_role.github_actions_terraform" "$GITHUB_ACTIONS_ROLE_NAME"
 
-  # Import EKS Access Entry for GitHub Actions role
   ROLE_ARN=$(aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" --query 'Role.Arn' --output text 2>/dev/null || true)
   if [[ -n "${ROLE_ARN:-}" ]] && [[ "${ROLE_ARN}" != "None" ]]; then
     CLUSTER_NAME="${NAME_PREFIX}-cluster"
-    # Check if access entry exists in AWS
     if aws eks describe-access-entry --cluster-name "$CLUSTER_NAME" --principal-arn "$ROLE_ARN" --region "$REGION" >/dev/null 2>&1; then
       tf_import "aws_eks_access_entry.github_actions[0]" "${CLUSTER_NAME}:${ROLE_ARN}"
-      
-      # Import EKS Access Policy Association for GitHub Actions role (cluster-admin)
+
       ADMIN_POLICY_ARN="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-      # List access policy associations for this principal
       ASSOC_IDS=$(aws eks list-access-policy-associations \
         --cluster-name "$CLUSTER_NAME" \
         --principal-arn "$ROLE_ARN" \

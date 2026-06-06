@@ -4,6 +4,13 @@ data "tls_certificate" "github_actions" {
 
 locals {
   github_actions_role_name_sanitized = startswith(var.github_actions_role_name, "arn:aws:iam::") ? regexreplace(var.github_actions_role_name, "^arn:aws:iam::[0-9]+:role/", "") : var.github_actions_role_name
+  github_actions_oidc_subjects = length(var.github_actions_oidc_subjects) > 0 ? var.github_actions_oidc_subjects : [
+    "repo:${var.github_actions_repository}:ref:refs/heads/main",
+    "repo:${var.github_actions_repository}:ref:refs/heads/dev",
+    "repo:${var.github_actions_repository}:pull_request",
+    "repo:${var.github_actions_repository}:environment:production",
+    "repo:${var.github_actions_repository}:environment:dev",
+  ]
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
@@ -40,7 +47,7 @@ data "aws_iam_policy_document" "github_actions_terraform_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = var.github_actions_oidc_subjects
+      values   = local.github_actions_oidc_subjects
     }
   }
 }

@@ -22,12 +22,16 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: us-east-1
+        env:
+          AWS_TERRAFORM_ROLE_ARN: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
       - name: Ensure Terraform State Bucket Exists
         run: bash scripts/create-tfstate-bucket.sh
       - name: Terraform Init
         working-directory: terraform
         run: terraform init -reconfigure
       - name: Import Pre-existing Resources
+        env:
+          AWS_TERRAFORM_ROLE_ARN: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
         run: bash scripts/terraform-import-existing.sh
       - name: Terraform Validate
         working-directory: terraform
@@ -60,12 +64,16 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: us-east-1
+        env:
+          AWS_TERRAFORM_ROLE_ARN: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
       - name: Ensure Terraform State Bucket Exists
         run: bash scripts/create-tfstate-bucket.sh
       - name: Terraform Init
         working-directory: terraform
         run: terraform init -reconfigure
       - name: Import Pre-existing Resources
+        env:
+          AWS_TERRAFORM_ROLE_ARN: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
         run: bash scripts/terraform-import-existing.sh
       - name: Terraform Validate
         working-directory: terraform

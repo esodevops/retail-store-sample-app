@@ -118,7 +118,10 @@ if aws iam get-role --role-name "$ROLE_NAME" &> /dev/null; then
                         \"StringLike\": {
                             \"token.actions.githubusercontent.com:sub\": [
                                 \"repo:${GITHUB_REPOSITORY}:ref:refs/heads/main\",
-                                \"repo:${GITHUB_REPOSITORY}:pull_request\"
+                                \"repo:${GITHUB_REPOSITORY}:ref:refs/heads/dev\",
+                                \"repo:${GITHUB_REPOSITORY}:pull_request\",
+                                \"repo:${GITHUB_REPOSITORY}:environment:production\",
+                                \"repo:${GITHUB_REPOSITORY}:environment:dev\"
                             ]
                         }
                     }
@@ -149,7 +152,10 @@ else
                         \"StringLike\": {
                             \"token.actions.githubusercontent.com:sub\": [
                                 \"repo:${GITHUB_REPOSITORY}:ref:refs/heads/main\",
-                                \"repo:${GITHUB_REPOSITORY}:pull_request\"
+                                \"repo:${GITHUB_REPOSITORY}:ref:refs/heads/dev\",
+                                \"repo:${GITHUB_REPOSITORY}:pull_request\",
+                                \"repo:${GITHUB_REPOSITORY}:environment:production\",
+                                \"repo:${GITHUB_REPOSITORY}:environment:dev\"
                             ]
                         }
                     }
