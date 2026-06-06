@@ -1,0 +1,158 @@
+name: Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+      version:
+        description: 'Version to deploy (e.g., v1.0.0 or latest)'
+        required: false
+        default: 'latest'
+  workflow_run:
+    workflows: ["Publish Build"]
+    types:
+      - completed
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: GithubActionsEKSDeploy
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name project-bedrock-cluster
+
+      - name: Verify cluster connection
+        run: kubectl cluster-info
+
+      - name: Get Terraform outputs
+        id: terraform-outputs
+        run: |
+          # Initialize terraform with backend
+          cd terraform
+          terraform init -backend-config="bucket=project-bedrock-tfstate-3765" -backend-config="key=state/terraform.tfstate" -backend-config="region=us-east-1" -reconfigure
+          
+          # Get outputs
+          echo "carts_irsa_role_arn=$(terraform output -raw carts_irsa_role_arn)" >> $GITHUB_OUTPUT
+          echo "catalog_mysql_endpoint=$(terraform output -raw catalog_mysql_endpoint)" >> $GITHUB_OUTPUT
+          echo "orders_postgres_endpoint=$(terraform output -raw orders_postgres_endpoint)" >> $GITHUB_OUTPUT
+          echo "dynamodb_table_name=$(terraform output -raw dynamodb_table_name)" >> $GITHUB_OUTPUT
+
+      - name: Create namespace and apply RBAC
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/clusterrolebinding-dev-view.yaml
+          kubectl apply -f k8s/aws-load-balancer-controller.yaml
+
+      - name: Install AWS Load Balancer Controller
+        run: |
+          helm repo add eks https://aws.github.io/eks-charts
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            --set clusterName=project-bedrock-cluster \
+            --set serviceAccount.create=true \
+            --set region=us-east-1 \
+            --wait --timeout=180s
+
+      - name: Generate values file
+        run: |
+          cat > helm/values-bedrock.generated.yaml << EOF
+          cart:
+            serviceAccount:
+              annotations:
+                eks.amazonaws.com/role-arn: "${{ steps.terraform-outputs.outputs.carts_irsa_role_arn }}"
+            app:
+              persistence:
+                dynamodb:
+                  tableName: "${{ steps.terraform-outputs.outputs.dynamodb_table_name }}"
+          
+          catalog:
+            app:
+              persistence:
+                mysql:
+                  endpoint: "${{ steps.terraform-outputs.outputs.catalog_mysql_endpoint }}"
+          
+          orders:
+            app:
+              persistence:
+                postgres:
+                  endpoint: "${{ steps.terraform-outputs.outputs.orders_postgres_endpoint }}"
+          EOF
+
+      - name: Deploy Retail Store Helm chart
+        id: deploy
+        run: |
+          # Build Helm dependencies
+          helm dependency build src/app/chart
+          
+          # Deploy the application
+          helm upgrade --install retail src/app/chart \
+            --namespace retail-app \
+            --create-namespace \
+            -f src/app/chart/values.yaml \
+            -f helm/values-bedrock.yaml \
+            -f helm/values-bedrock.generated.yaml \
+            --wait --timeout=600s
+          
+          # Apply ingress
+          kubectl apply -f k8s/ingress.yaml
+          
+          # Wait for ingress to be available
+          echo "Waiting for LoadBalancer to be provisioned..."
+          kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' ingress/ui -n retail-app --timeout=300s
+          
+          # Get the ingress URL
+          INGRESS_URL=$(kubectl get ingress ui -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "url=http://${INGRESS_URL}" >> $GITHUB_OUTPUT
+          echo "Application deployed to: http://${INGRESS_URL}"
+
+      - name: Verify deployment
+        run: |
+          echo "Checking pod status..."
+          kubectl get pods -n retail-app
+          
+          echo "Checking ingress..."
+          kubectl get ingress -n retail-app
+          
+          echo "Waiting for all pods to be ready..."
+          kubectl wait --for=condition=ready pod --all -n retail-app --timeout=300s
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.deploy.outputs.url }}" ]; then
+            echo "**URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pod Status" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n retail-app >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
