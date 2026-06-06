@@ -16,7 +16,8 @@ tf_import() {
     echo "[SKIP]   $addr already in state"
   else
     echo "[IMPORT] $addr  <-  $id"
-    terraform -chdir="$TFDIR" import "$addr" "$id"
+    # Continue even if import fails (resource might have dependencies not yet imported)
+    terraform -chdir="$TFDIR" import "$addr" "$id" 2>/dev/null || echo "[WARN]    Failed to import $addr (may need manual intervention)"
   fi
 }
 
@@ -146,6 +147,31 @@ if aws lambda get-function --function-name "bedrock-asset-processor" --region "$
   fi
 fi
 
+# ---------- EKS Cluster ----------
+if aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" >/dev/null 2>&1; then
+  tf_import "module.eks.module.eks.aws_eks_cluster.this[0]" "${NAME_PREFIX}-cluster"
+  
+  # Import EKS security group
+  CLUSTER_ARN=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" --query 'cluster.arn' --output text 2>/dev/null || true)
+  if [[ -n "${CLUSTER_ARN:-}" ]] && [[ "${CLUSTER_ARN}" != "None" ]]; then
+    # Get the security group ID from the cluster
+    SG_ID=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" \
+      --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text 2>/dev/null || true)
+    if [[ -n "${SG_ID:-}" ]] && [[ "${SG_ID}" != "None" ]]; then
+      tf_import "module.eks.module.eks.aws_security_group.cluster[0]" "$SG_ID"
+    fi
+  fi
+  
+  # Import EKS OIDC provider
+  OIDC_URL=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" \
+    --query 'cluster.identity.oidc.issuer' --output text 2>/dev/null || true)
+  if [[ -n "${OIDC_URL:-}" ]] && [[ "${OIDC_URL}" != "None" ]]; then
+    # Extract the provider name from the URL
+    OIDC_PROVIDER_NAME=$(echo "$OIDC_URL" | sed 's|https://||' | sed 's|/$||')
+    tf_import "module.eks.module.eks.aws_iam_openid_connect_provider.oidc_provider[0]" "$OIDC_PROVIDER_NAME"
+  fi
+fi
+
 # ---------- KMS alias ----------
 KMS_ALIAS_EXISTS=$(aws kms list-aliases --region "$REGION" \
   --query "Aliases[?AliasName=='alias/eks/${NAME_PREFIX}-cluster'].AliasName" \
@@ -209,6 +235,15 @@ for addon in $(aws eks list-addons --cluster-name "${NAME_PREFIX}-cluster" --reg
   if [[ -n "${addon:-}" ]]; then
     tf_import "module.eks.module.eks.aws_eks_addon.this[\"${addon}\"]" \
       "${NAME_PREFIX}-cluster/${addon}"
+  fi
+done
+
+# ---------- EKS Managed Node Groups ----------
+for ng in $(aws eks list-nodegroups --cluster-name "${NAME_PREFIX}-cluster" --region "$REGION" \
+     --query 'nodegroups[*]' --output text 2>/dev/null || true); do
+  if [[ -n "${ng:-}" ]]; then
+    tf_import "module.eks.module.eks.aws_eks_node_group.this[\"${ng}\"]" \
+      "${NAME_PREFIX}-cluster/${ng}"
   fi
 done
 
