@@ -212,6 +212,18 @@ variable "github_actions_repository" {
   default = "esodevops/retail-store-sample-app"
 }
 
+# OIDC subject patterns for GitHub Actions
+# These patterns control which GitHub Actions can assume the role
+# Format: repo:owner/repo:ref:refs/heads/branch or repo:owner/repo:environment:environment_name
+variable "github_actions_oidc_subjects" {
+  type = list(string)
+  default = [
+    "repo:esodevops/retail-store-sample-app:ref:refs/heads/main",
+    "repo:esodevops/retail-store-sample-app:pull_request",
+    "repo:esodevops/retail-store-sample-app:environment:production",
+  ]
+}
+
 variable "github_actions_role_name" {
   type    = string
   default = "project-bedrock-github-actions-terraform"
