@@ -33,5 +33,5 @@ resource "aws_iam_user_login_profile" "dev_view" {
   count                   = var.create_console_login_profile ? 1 : 0
   user                    = aws_iam_user.dev_view.name
   password_length         = 20
-  password_reset_required = true
+  password_reset_required = false
 }
