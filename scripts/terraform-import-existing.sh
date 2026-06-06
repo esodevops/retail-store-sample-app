@@ -7,6 +7,7 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
 NAME_PREFIX="${NAME_PREFIX:-project-bedrock}"
+CLUSTER_NAME="${CLUSTER_NAME:-${NAME_PREFIX}-cluster}"
 TFDIR="${TFDIR:-terraform}"
 
 tf_import() {
@@ -14,10 +15,32 @@ tf_import() {
   local id="$2"
   if terraform -chdir="$TFDIR" state show "$addr" >/dev/null 2>&1; then
     echo "[SKIP]   $addr already in state"
-  else
-    echo "[IMPORT] $addr  <-  $id"
-    # Continue even if import fails (resource might have dependencies not yet imported)
-    terraform -chdir="$TFDIR" import "$addr" "$id" 2>/dev/null || echo "[WARN]    Failed to import $addr (may need manual intervention)"
+    return 0
+  fi
+
+  echo "[IMPORT] $addr  <-  $id"
+  # Continue even if import fails (resource might have dependencies not yet imported)
+  if terraform -chdir="$TFDIR" import "$addr" "$id"; then
+    return 0
+  fi
+  echo "[WARN]    Failed to import $addr (may need manual intervention)"
+  return 0
+}
+
+tf_import_failed() {
+  local addr="$1"
+  ! terraform -chdir="$TFDIR" state show "$addr" >/dev/null 2>&1
+}
+
+# Import resources that must exist in state when already present in AWS.
+tf_import_required() {
+  local addr="$1"
+  local id="$2"
+  tf_import "$addr" "$id"
+  if tf_import_failed "$addr"; then
+    echo "[ERROR]  Required import failed for $addr"
+    echo "         Run manually: terraform -chdir=$TFDIR import '$addr' '$id'"
+    exit 1
   fi
 }
 
@@ -128,6 +151,10 @@ if [[ -n "${IAM_POLICY_ARN:-}" ]] && [[ "${IAM_POLICY_ARN}" != "None" ]]; then
 fi
 
 # ---------- IAM Roles ----------
+if aws iam get-role --role-name "${CLUSTER_NAME}-alb-controller" >/dev/null 2>&1; then
+  tf_import "module.eks.module.alb_controller_irsa.aws_iam_role.this[0]" "${CLUSTER_NAME}-alb-controller"
+fi
+
 if aws iam get-role --role-name "${NAME_PREFIX}-carts-irsa" >/dev/null 2>&1; then
   tf_import "module.data.aws_iam_role.carts_irsa" "${NAME_PREFIX}-carts-irsa"
 fi
@@ -147,38 +174,66 @@ if aws lambda get-function --function-name "bedrock-asset-processor" --region "$
   fi
 fi
 
-# ---------- EKS Cluster ----------
-if aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" >/dev/null 2>&1; then
-  tf_import "module.eks.module.eks.aws_eks_cluster.this[0]" "${NAME_PREFIX}-cluster"
-  
-  # Import EKS security group
-  CLUSTER_ARN=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" --query 'cluster.arn' --output text 2>/dev/null || true)
-  if [[ -n "${CLUSTER_ARN:-}" ]] && [[ "${CLUSTER_ARN}" != "None" ]]; then
-    # Get the security group ID from the cluster
-    SG_ID=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" \
-      --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text 2>/dev/null || true)
-    if [[ -n "${SG_ID:-}" ]] && [[ "${SG_ID}" != "None" ]]; then
-      tf_import "module.eks.module.eks.aws_security_group.cluster[0]" "$SG_ID"
-    fi
+# ---------- EKS Cluster and dependencies ----------
+if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" >/dev/null 2>&1; then
+  echo "=== Importing existing EKS cluster: $CLUSTER_NAME ==="
+
+  # KMS key (must be imported before cluster when encryption is enabled)
+  KMS_KEY_ID=$(aws kms describe-key \
+    --key-id "alias/eks/${CLUSTER_NAME}" \
+    --region "$REGION" \
+    --query 'KeyMetadata.KeyId' \
+    --output text 2>/dev/null || true)
+  if [[ -n "${KMS_KEY_ID:-}" ]] && [[ "${KMS_KEY_ID}" != "None" ]]; then
+    tf_import "module.eks.module.eks.module.kms.aws_kms_key.this[0]" "$KMS_KEY_ID"
+    tf_import "module.eks.module.eks.module.kms.aws_kms_alias.this[\"cluster\"]" \
+      "alias/eks/${CLUSTER_NAME}"
   fi
-  
-  # Import EKS OIDC provider
-  OIDC_URL=$(aws eks describe-cluster --name "${NAME_PREFIX}-cluster" --region "$REGION" \
+
+  # Cluster IAM role
+  CLUSTER_ROLE_NAME=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
+    --query 'cluster.roleArn' --output text 2>/dev/null | awk -F'/' '{print $NF}' || true)
+  if [[ -n "${CLUSTER_ROLE_NAME:-}" ]] && [[ "${CLUSTER_ROLE_NAME}" != "None" ]]; then
+    tf_import "module.eks.module.eks.aws_iam_role.this[0]" "$CLUSTER_ROLE_NAME"
+  fi
+
+  # Cluster and node security groups
+  CLUSTER_SG_ID=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
+    --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text 2>/dev/null || true)
+  if [[ -n "${CLUSTER_SG_ID:-}" ]] && [[ "${CLUSTER_SG_ID}" != "None" ]]; then
+    tf_import "module.eks.module.eks.aws_security_group.cluster[0]" "$CLUSTER_SG_ID"
+  fi
+
+  CLUSTER_VPC_ID=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
+    --query 'cluster.resourcesVpcConfig.vpcId' --output text 2>/dev/null || true)
+  NODE_SG_ID=$(aws ec2 describe-security-groups \
+    --region "$REGION" \
+    --filters "Name=tag:Name,Values=${CLUSTER_NAME}-node" "Name=vpc-id,Values=${CLUSTER_VPC_ID}" \
+    --query 'SecurityGroups[0].GroupId' \
+    --output text 2>/dev/null || true)
+  if [[ -n "${NODE_SG_ID:-}" ]] && [[ "${NODE_SG_ID}" != "None" ]]; then
+    tf_import "module.eks.module.eks.aws_security_group.node[0]" "$NODE_SG_ID"
+  fi
+
+  # CloudWatch log group should exist before cluster import
+  LOG_GROUP_NAME="/aws/eks/${CLUSTER_NAME}/cluster"
+  if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP_NAME" \
+       --region "$REGION" \
+       --query "logGroups[0].logGroupName" \
+       --output text 2>/dev/null | grep -q "$LOG_GROUP_NAME"; then
+    tf_import "module.eks.module.eks.aws_cloudwatch_log_group.this[0]" "$LOG_GROUP_NAME"
+  fi
+
+  # Cluster itself — fail the workflow if this cannot be imported
+  tf_import_required "module.eks.module.eks.aws_eks_cluster.this[0]" "$CLUSTER_NAME"
+
+  # EKS OIDC provider
+  OIDC_URL=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
     --query 'cluster.identity.oidc.issuer' --output text 2>/dev/null || true)
   if [[ -n "${OIDC_URL:-}" ]] && [[ "${OIDC_URL}" != "None" ]]; then
-    # Extract the provider name from the URL
     OIDC_PROVIDER_NAME=$(echo "$OIDC_URL" | sed 's|https://||' | sed 's|/$||')
     tf_import "module.eks.module.eks.aws_iam_openid_connect_provider.oidc_provider[0]" "$OIDC_PROVIDER_NAME"
   fi
-fi
-
-# ---------- KMS alias ----------
-KMS_ALIAS_EXISTS=$(aws kms list-aliases --region "$REGION" \
-  --query "Aliases[?AliasName=='alias/eks/${NAME_PREFIX}-cluster'].AliasName" \
-  --output text 2>/dev/null || true)
-if [[ -n "${KMS_ALIAS_EXISTS:-}" ]]; then
-  tf_import "module.eks.module.eks.module.kms.aws_kms_alias.this[\"cluster\"]" \
-    "alias/eks/${NAME_PREFIX}-cluster"
 fi
 
 # ---------- GitHub Actions OIDC Provider ----------
@@ -220,30 +275,43 @@ if aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" >/dev/null 2>&1; the
   fi
 fi
 
-# ---------- CloudWatch Log Group for EKS Cluster ----------
-LOG_GROUP_NAME="/aws/eks/${NAME_PREFIX}-cluster/cluster"
-if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP_NAME" \
-     --region "$REGION" \
-     --query "logGroups[0].logGroupName" \
-     --output text 2>/dev/null | grep -q "$LOG_GROUP_NAME"; then
-  tf_import "module.eks.module.eks.aws_cloudwatch_log_group.this[0]" "$LOG_GROUP_NAME"
-fi
-
 # ---------- EKS Addons ----------
-for addon in $(aws eks list-addons --cluster-name "${NAME_PREFIX}-cluster" --region "$REGION" \
+for addon in $(aws eks list-addons --cluster-name "$CLUSTER_NAME" --region "$REGION" \
      --query 'addons[*]' --output text 2>/dev/null || true); do
   if [[ -n "${addon:-}" ]]; then
     tf_import "module.eks.module.eks.aws_eks_addon.this[\"${addon}\"]" \
-      "${NAME_PREFIX}-cluster/${addon}"
+      "${CLUSTER_NAME}/${addon}"
   fi
 done
 
-# ---------- EKS Managed Node Groups ----------
-for ng in $(aws eks list-nodegroups --cluster-name "${NAME_PREFIX}-cluster" --region "$REGION" \
+# ---------- EKS Managed Node Groups (terraform-aws-modules/eks v20+) ----------
+# Map AWS node group name prefixes to Terraform module keys in variables.tf
+declare -A NG_KEY_BY_PREFIX=(
+  ["bedrock-server-1"]="server-1"
+  ["bedrock-server-2"]="server-2"
+  ["${NAME_PREFIX}-server-1"]="server-1"
+  ["${NAME_PREFIX}-server-2"]="server-2"
+)
+
+for ng in $(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --region "$REGION" \
      --query 'nodegroups[*]' --output text 2>/dev/null || true); do
-  if [[ -n "${ng:-}" ]]; then
-    tf_import "module.eks.module.eks.aws_eks_node_group.this[\"${ng}\"]" \
-      "${NAME_PREFIX}-cluster/${ng}"
+  if [[ -z "${ng:-}" ]]; then
+    continue
+  fi
+
+  ng_key=""
+  for prefix in "${!NG_KEY_BY_PREFIX[@]}"; do
+    if [[ "$ng" == "${prefix}"* ]]; then
+      ng_key="${NG_KEY_BY_PREFIX[$prefix]}"
+      break
+    fi
+  done
+
+  if [[ -n "$ng_key" ]]; then
+    tf_import "module.eks.module.eks.module.eks_managed_node_group[\"${ng_key}\"].aws_eks_node_group.this[0]" \
+      "${CLUSTER_NAME}/${ng}"
+  else
+    echo "[WARN]    Could not map node group '$ng' to a Terraform module key; skipping import"
   fi
 done
 

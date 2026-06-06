@@ -37,3 +37,7 @@ output "github_actions_terraform_role_arn" {
 output "github_actions_role_arn" {
   value = aws_iam_role.github_actions_terraform.arn
 }
+
+output "alb_controller_role_arn" {
+  value = module.eks.alb_controller_role_arn
+}

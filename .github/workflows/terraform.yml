@@ -5,7 +5,7 @@ on:
   pull_request:
     paths: ["terraform/**"]
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: ["terraform/**"]
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
             });
 
   apply:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

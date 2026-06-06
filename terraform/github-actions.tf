@@ -40,11 +40,7 @@ data "aws_iam_policy_document" "github_actions_terraform_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_actions_repository}:ref:refs/heads/main",
-        "repo:${var.github_actions_repository}:pull_request",
-        "repo:${var.github_actions_repository}:environment:production",
-      ]
+      values   = var.github_actions_oidc_subjects
     }
   }
 }

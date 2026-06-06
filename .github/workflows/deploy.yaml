@@ -10,10 +10,13 @@ on:
         type: choice
         options:
           - production
+          - dev
       version:
         description: 'Version to deploy (e.g., v1.0.0 or latest)'
         required: false
         default: 'latest'
+  push:
+    branches: [main, dev]
   workflow_run:
     workflows: ["Publish Build"]
     types:
@@ -23,15 +26,46 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: project-bedrock-cluster
+
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event.inputs.environment || 'production' }}
+      name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/dev' && 'dev' || 'production') }}
       url: ${{ steps.deploy.outputs.url }}
 
     steps:
+      - name: Resolve deployment target
+        id: target
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            ENV="dev"
+          else
+            ENV="production"
+          fi
+
+          if [[ "$ENV" == "dev" ]]; then
+            echo "namespace=retail-app-dev" >> "$GITHUB_OUTPUT"
+            echo "release_name=retail-dev" >> "$GITHUB_OUTPUT"
+            echo "ingress_manifest=k8s/ingress-dev.yaml" >> "$GITHUB_OUTPUT"
+            echo "namespace_manifest=k8s/namespace-dev.yaml" >> "$GITHUB_OUTPUT"
+          else
+            echo "namespace=retail-app" >> "$GITHUB_OUTPUT"
+            echo "release_name=retail" >> "$GITHUB_OUTPUT"
+            echo "ingress_manifest=k8s/ingress.yaml" >> "$GITHUB_OUTPUT"
+            echo "namespace_manifest=k8s/namespace.yaml" >> "$GITHUB_OUTPUT"
+          fi
+          echo "environment=$ENV" >> "$GITHUB_OUTPUT"
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -54,60 +88,67 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
           role-session-name: GithubActionsEKSDeploy
 
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --region us-east-1 --name project-bedrock-cluster
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
       - name: Verify cluster connection
         run: kubectl cluster-info
 
-      - name: Verify Terraform is installed
-        run: |
-          which terraform || echo "Terraform not found in PATH: $PATH"
-          terraform version
+      - name: Wait for worker nodes
+        run: kubectl wait --for=condition=ready node --all --timeout=300s
 
       - name: Get Terraform outputs
         id: terraform-outputs
         run: |
-          # Initialize terraform with backend
           cd terraform
-          terraform init -backend-config="bucket=project-bedrock-tfstate-3765" -backend-config="key=state/terraform.tfstate" -backend-config="region=us-east-1" -reconfigure
-          
-          # Get outputs
-          echo "carts_irsa_role_arn=$(terraform output -raw carts_irsa_role_arn)" >> $GITHUB_OUTPUT
-          echo "catalog_mysql_endpoint=$(terraform output -raw catalog_mysql_endpoint)" >> $GITHUB_OUTPUT
-          echo "orders_postgres_endpoint=$(terraform output -raw orders_postgres_endpoint)" >> $GITHUB_OUTPUT
-          echo "dynamodb_table_name=$(terraform output -raw dynamodb_table_name)" >> $GITHUB_OUTPUT
+          terraform init -backend-config="bucket=project-bedrock-tfstate-3765" -backend-config="key=state/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}" -reconfigure
+
+          echo "carts_irsa_role_arn=$(terraform output -raw carts_irsa_role_arn)" >> "$GITHUB_OUTPUT"
+          echo "catalog_mysql_endpoint=$(terraform output -raw catalog_mysql_endpoint)" >> "$GITHUB_OUTPUT"
+          echo "orders_postgres_endpoint=$(terraform output -raw orders_postgres_endpoint)" >> "$GITHUB_OUTPUT"
+          echo "dynamodb_table_name=$(terraform output -raw dynamodb_table_name)" >> "$GITHUB_OUTPUT"
+          echo "alb_controller_role_arn=$(terraform output -raw alb_controller_role_arn)" >> "$GITHUB_OUTPUT"
+          echo "vpc_id=$(terraform output -raw vpc_id)" >> "$GITHUB_OUTPUT"
 
       - name: Create namespace and apply RBAC
         run: |
-          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f ${{ steps.target.outputs.namespace_manifest }}
           kubectl apply -f k8s/clusterrolebinding-dev-view.yaml
           kubectl apply -f k8s/aws-load-balancer-controller.yaml
 
       - name: Install AWS Load Balancer Controller
         run: |
-          helm repo add eks https://aws.github.io/eks-charts
-          # Use existing service account created by Terraform IRSA (eks-blueprints-addons)
-          # Do NOT create a new service account as it won't have the IAM role annotation
+          set -euo pipefail
+
+          ALB_ROLE_ARN="${{ steps.terraform-outputs.outputs.alb_controller_role_arn }}"
+          if [[ -z "$ALB_ROLE_ARN" ]]; then
+            echo "ERROR: alb_controller_role_arn is empty. Run terraform apply first."
+            exit 1
+          fi
+
+          sed "s|REPLACE_WITH_ALB_CONTROLLER_ROLE_ARN|${ALB_ROLE_ARN}|g" \
+            k8s/aws-load-balancer-controller-sa.yaml | kubectl apply -f -
+
+          helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
+          helm repo update
+
           helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
             -n kube-system \
-            --set clusterName=project-bedrock-cluster \
+            --set clusterName=${{ env.CLUSTER_NAME }} \
             --set serviceAccount.create=false \
             --set serviceAccount.name=aws-load-balancer-controller \
-            --set region=us-east-1 \
-            --set vpcId=$(aws eks describe-cluster --name project-bedrock-cluster --region us-east-1 --query 'cluster.resourcesVpcConfig.vpcId' --output text) \
-            --wait --timeout=180s
-          
-          echo "Waiting for AWS Load Balancer Controller to be ready..."
-          kubectl wait --for=condition=available deployment/aws-load-balancer-controller -n kube-system --timeout=120s
-          
-          # Verify IRSA is working by checking service account annotations
+            --set region=${{ env.AWS_REGION }} \
+            --set vpcId=${{ steps.terraform-outputs.outputs.vpc_id }} \
+            --wait --timeout=600s
+
+          kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=300s
+
           echo "Verifying IRSA configuration..."
-          kubectl get serviceaccount aws-load-balancer-controller -n kube-system -o jsonpath='{.metadata.annotations}' || echo "Warning: ServiceAccount annotations not found"
+          kubectl get serviceaccount aws-load-balancer-controller -n kube-system -o yaml
+          kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
 
       - name: Generate values file
         run: |
@@ -120,13 +161,13 @@ jobs:
               persistence:
                 dynamodb:
                   tableName: "${{ steps.terraform-outputs.outputs.dynamodb_table_name }}"
-          
+
           catalog:
             app:
               persistence:
                 mysql:
                   endpoint: "${{ steps.terraform-outputs.outputs.catalog_mysql_endpoint }}"
-          
+
           orders:
             app:
               persistence:
@@ -137,82 +178,85 @@ jobs:
       - name: Deploy Retail Store Helm chart
         id: deploy
         run: |
-          # Build Helm dependencies
+          set -euo pipefail
+
+          NAMESPACE="${{ steps.target.outputs.namespace }}"
+          RELEASE="${{ steps.target.outputs.release_name }}"
+          INGRESS_MANIFEST="${{ steps.target.outputs.ingress_manifest }}"
+
           helm dependency build src/app/chart
-          
-          # Deploy the application
-          helm upgrade --install retail src/app/chart \
-            --namespace retail-app \
+
+          helm upgrade --install "$RELEASE" src/app/chart \
+            --namespace "$NAMESPACE" \
             --create-namespace \
             -f src/app/chart/values.yaml \
             -f helm/values-bedrock.yaml \
             -f helm/values-bedrock.generated.yaml \
             --wait --timeout=600s
-          
-          # Apply ingress
-          kubectl apply -f k8s/ingress.yaml
-          
-          # Wait for ingress to be available
+
+          kubectl apply -f "$INGRESS_MANIFEST"
+
           echo "Waiting for LoadBalancer to be provisioned..."
-          
-          # Set up a longer timeout and add debugging
           MAX_ATTEMPTS=60
           ATTEMPT=0
+          INGRESS_STATUS=""
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            INGRESS_STATUS=$(kubectl get ingress retail-ui-ingress -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            INGRESS_STATUS=$(kubectl get ingress retail-ui-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
             if [ -n "$INGRESS_STATUS" ]; then
               echo "LoadBalancer provisioned successfully!"
               break
             fi
             echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Waiting for LoadBalancer..."
-            
-            # Show ingress events for debugging
+
             if [ $ATTEMPT -eq 10 ]; then
               echo "=== Ingress Events ==="
-              kubectl describe ingress retail-ui-ingress -n retail-app || true
+              kubectl describe ingress retail-ui-ingress -n "$NAMESPACE" || true
               echo "=== AWS Load Balancer Controller Logs ==="
               kubectl logs -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system --tail=50 || true
             fi
-            
+
             sleep 10
             ATTEMPT=$((ATTEMPT + 1))
           done
-          
+
           if [ -z "$INGRESS_STATUS" ]; then
             echo "=== Final Ingress Status ==="
-            kubectl describe ingress retail-ui-ingress -n retail-app || true
+            kubectl describe ingress retail-ui-ingress -n "$NAMESPACE" || true
             echo "=== AWS Load Balancer Controller Status ==="
             kubectl get pods -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system || true
             echo "ERROR: LoadBalancer provisioning timed out"
             exit 1
           fi
-          
-          echo "url=http://${INGRESS_STATUS}" >> $GITHUB_OUTPUT
+
+          echo "url=http://${INGRESS_STATUS}" >> "$GITHUB_OUTPUT"
           echo "Application deployed to: http://${INGRESS_STATUS}"
 
       - name: Verify deployment
         run: |
+          NAMESPACE="${{ steps.target.outputs.namespace }}"
           echo "Checking pod status..."
-          kubectl get pods -n retail-app
-          
+          kubectl get pods -n "$NAMESPACE"
+
           echo "Checking ingress..."
-          kubectl get ingress -n retail-app
-          
+          kubectl get ingress -n "$NAMESPACE"
+
           echo "Waiting for all pods to be ready..."
-          kubectl wait --for=condition=ready pod --all -n retail-app --timeout=300s
+          kubectl wait --for=condition=ready pod --all -n "$NAMESPACE" --timeout=300s
 
       - name: Deployment summary
         if: always()
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          NAMESPACE="${{ steps.target.outputs.namespace }}"
+          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Environment:** ${{ steps.target.outputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Namespace:** $NAMESPACE" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Status:** ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "${{ steps.deploy.outputs.url }}" ]; then
-            echo "**URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**URL:** ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Pod Status" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          kubectl get pods -n retail-app >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Pod Status" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          kubectl get pods -n "$NAMESPACE" >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
