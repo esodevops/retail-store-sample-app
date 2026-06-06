@@ -64,6 +64,11 @@ jobs:
       - name: Verify cluster connection
         run: kubectl cluster-info
 
+      - name: Verify Terraform is installed
+        run: |
+          which terraform || echo "Terraform not found in PATH: $PATH"
+          terraform version
+
       - name: Get Terraform outputs
         id: terraform-outputs
         run: |
