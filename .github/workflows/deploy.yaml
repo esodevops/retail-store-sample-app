@@ -91,16 +91,23 @@ jobs:
       - name: Install AWS Load Balancer Controller
         run: |
           helm repo add eks https://aws.github.io/eks-charts
+          # Use existing service account created by Terraform IRSA (eks-blueprints-addons)
+          # Do NOT create a new service account as it won't have the IAM role annotation
           helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
             -n kube-system \
             --set clusterName=project-bedrock-cluster \
-            --set serviceAccount.create=true \
+            --set serviceAccount.create=false \
+            --set serviceAccount.name=aws-load-balancer-controller \
             --set region=us-east-1 \
             --set vpcId=$(aws eks describe-cluster --name project-bedrock-cluster --region us-east-1 --query 'cluster.resourcesVpcConfig.vpcId' --output text) \
             --wait --timeout=180s
           
           echo "Waiting for AWS Load Balancer Controller to be ready..."
           kubectl wait --for=condition=available deployment/aws-load-balancer-controller -n kube-system --timeout=120s
+          
+          # Verify IRSA is working by checking service account annotations
+          echo "Verifying IRSA configuration..."
+          kubectl get serviceaccount aws-load-balancer-controller -n kube-system -o jsonpath='{.metadata.annotations}' || echo "Warning: ServiceAccount annotations not found"
 
       - name: Generate values file
         run: |
