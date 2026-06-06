@@ -70,6 +70,11 @@ resource "aws_eks_access_entry" "github_actions" {
   type          = "STANDARD"
   user_name     = local.github_actions_role_name_sanitized
   tags          = local.tags
+
+  lifecycle {
+    prevent_destroy = false
+    create_before_destroy = true
+  }
 }
 
 # Grant cluster-admin permissions to the GitHub Actions role
