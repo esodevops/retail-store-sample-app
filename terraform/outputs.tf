@@ -20,7 +20,10 @@ output "orders_db_password" {
   sensitive = true
 }
 
-output "bedrock_dev_view_access_key_id" { value = module.iam.access_key_id }
+output "bedrock_dev_view_access_key_id" {
+  value     = module.iam.access_key_id
+  sensitive = true
+}
 output "bedrock_dev_view_secret_access_key" {
   value     = module.iam.secret_access_key
   sensitive = true

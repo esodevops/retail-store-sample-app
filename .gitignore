@@ -26,6 +26,7 @@ screenshots
 
 .env
 .direnv
+grading.private.json
 
 .pre-commit-config.yaml
 

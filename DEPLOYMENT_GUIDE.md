@@ -81,12 +81,20 @@ Open the ALB hostname from the ingress status. All pods should be `Running` and 
 ./scripts/generate-grading-json.sh
 ```
 
-Commit `grading.json` after apply.
+Commit `grading.json` after apply. This file is redacted so GitHub can accept the commit.
+
+To generate a private grading file with the real `bedrock-dev-view` credentials for your teacher, run:
+
+```sh
+INCLUDE_SENSITIVE_OUTPUTS=true OUTPUT_FILE=grading.private.json ./scripts/generate-grading-json.sh
+```
+
+Do not commit `grading.private.json`; send it through your course's private submission channel.
 
 ### Developer credentials (`bedrock-dev-view`)
 
 ```sh
-terraform -chdir=terraform output bedrock_dev_view_access_key_id
+terraform -chdir=terraform output -raw bedrock_dev_view_access_key_id
 terraform -chdir=terraform output -raw bedrock_dev_view_secret_access_key
 terraform -chdir=terraform output -raw bedrock_dev_view_console_password
 ```
