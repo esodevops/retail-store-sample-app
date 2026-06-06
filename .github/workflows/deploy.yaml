@@ -96,7 +96,11 @@ jobs:
             --set clusterName=project-bedrock-cluster \
             --set serviceAccount.create=true \
             --set region=us-east-1 \
+            --set vpcId=$(aws eks describe-cluster --name project-bedrock-cluster --region us-east-1 --query 'cluster.resourcesVpcConfig.vpcId' --output text) \
             --wait --timeout=180s
+          
+          echo "Waiting for AWS Load Balancer Controller to be ready..."
+          kubectl wait --for=condition=available deployment/aws-load-balancer-controller -n kube-system --timeout=120s
 
       - name: Generate values file
         run: |
@@ -143,12 +147,41 @@ jobs:
           
           # Wait for ingress to be available
           echo "Waiting for LoadBalancer to be provisioned..."
-          kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].hostname}' ingress/retail-ui-ingress -n retail-app --timeout=300s
           
-          # Get the ingress URL
-          INGRESS_URL=$(kubectl get ingress retail-ui-ingress -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "url=http://${INGRESS_URL}" >> $GITHUB_OUTPUT
-          echo "Application deployed to: http://${INGRESS_URL}"
+          # Set up a longer timeout and add debugging
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            INGRESS_STATUS=$(kubectl get ingress retail-ui-ingress -n retail-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$INGRESS_STATUS" ]; then
+              echo "LoadBalancer provisioned successfully!"
+              break
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Waiting for LoadBalancer..."
+            
+            # Show ingress events for debugging
+            if [ $ATTEMPT -eq 10 ]; then
+              echo "=== Ingress Events ==="
+              kubectl describe ingress retail-ui-ingress -n retail-app || true
+              echo "=== AWS Load Balancer Controller Logs ==="
+              kubectl logs -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system --tail=50 || true
+            fi
+            
+            sleep 10
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          if [ -z "$INGRESS_STATUS" ]; then
+            echo "=== Final Ingress Status ==="
+            kubectl describe ingress retail-ui-ingress -n retail-app || true
+            echo "=== AWS Load Balancer Controller Status ==="
+            kubectl get pods -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system || true
+            echo "ERROR: LoadBalancer provisioning timed out"
+            exit 1
+          fi
+          
+          echo "url=http://${INGRESS_STATUS}" >> $GITHUB_OUTPUT
+          echo "Application deployed to: http://${INGRESS_STATUS}"
 
       - name: Verify deployment
         run: |
