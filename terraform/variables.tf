@@ -103,6 +103,7 @@ variable "eks_managed_node_groups" {
       instance_types  = ["t3.small"]
       name            = "project-bedrock-server-1"
       use_name_prefix = true
+      iam_role_name   = "project-bedrock-server-1-ng-role"
       tags = {
         Name    = "project-bedrock-server-1"
         Project = "karatu-2025-capstone"
@@ -116,6 +117,7 @@ variable "eks_managed_node_groups" {
       instance_types  = ["t3.small"]
       name            = "project-bedrock-server-2"
       use_name_prefix = true
+      iam_role_name   = "project-bedrock-server-2-ng-role"
       tags = {
         Name    = "project-bedrock-server-2"
         Project = "karatu-2025-capstone"
