@@ -95,29 +95,29 @@ variable "cluster_addons" {
 variable "eks_managed_node_groups" {
   type = any
   default = {
-    # Standardized naming: bedrock-server-1
+    # Standardized naming: project-bedrock-server-1
     server-1 = {
       desired_size    = 2
       max_size        = 3
       min_size        = 1
       instance_types  = ["t3.small"]
+      name            = "project-bedrock-server-1"
       use_name_prefix = true
-      name_prefix     = "bedrock-server-1"
       tags = {
-        Name    = "bedrock-server-1"
+        Name    = "project-bedrock-server-1"
         Project = "karatu-2025-capstone"
       }
     }
-    # Standardized naming: bedrock-server-2
+    # Standardized naming: project-bedrock-server-2
     server-2 = {
       desired_size    = 2
       max_size        = 3
       min_size        = 1
       instance_types  = ["t3.small"]
+      name            = "project-bedrock-server-2"
       use_name_prefix = true
-      name_prefix     = "bedrock-server-2"
       tags = {
-        Name    = "bedrock-server-2"
+        Name    = "project-bedrock-server-2"
         Project = "karatu-2025-capstone"
       }
     }

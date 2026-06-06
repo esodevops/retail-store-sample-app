@@ -45,12 +45,10 @@ aws eks update-kubeconfig --region us-east-1 --name project-bedrock-cluster
 ## 5. Deploy Retail Store (Helm)
 
 ```sh
-./scripts/sync-retail-secrets.sh
 ./helm/deploy-bedrock.sh
-kubectl apply -f k8s/clusterrolebinding-dev-view.yaml
 ```
 
-`./helm/deploy-bedrock.sh` applies `k8s/ingress.yaml` (HTTP) by default.
+`./helm/deploy-bedrock.sh` updates kubeconfig, syncs RDS credentials into Kubernetes secrets, deploys the AWS Load Balancer Controller, installs the Retail Store Helm chart into `retail-app`, and applies `k8s/ingress.yaml` (HTTP) by default. Run it with deployer/admin AWS credentials, not the read-only `bedrock-dev-view` credentials.
 
 To enable HTTPS, update `k8s/ingress-tls.yaml` and replace:
 
@@ -74,8 +72,8 @@ Open the ALB hostname from the ingress status. All pods should be `Running` and 
 
 ## 7. CI/CD Pipeline
 
-- Open a PR touching `terraform/**` -> GitHub Actions runs `terraform plan` and comments output
-- Merge to `main` -> workflow runs `terraform apply`
+- Open a PR -> GitHub Actions runs `terraform plan` and comments output
+- Merge to `main` or `dev` -> workflow runs `terraform apply`, deploys the Retail Store app, and writes `grading.json`
 
 ## 8. Grading Artifacts
 

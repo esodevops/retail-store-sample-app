@@ -14,6 +14,7 @@ module "state" {
 
 module "vpc" {
   source                  = "./modules/vpc"
+  name_prefix             = var.name_prefix
   vpc_name                = var.vpc_name
   vpc_cidr                = var.vpc_cidr
   vpc_azs                 = var.vpc_azs
@@ -65,6 +66,8 @@ resource "aws_eks_access_policy_association" "bedrock_dev_view_policy" {
   access_scope {
     type = "cluster"
   }
+
+  depends_on = [aws_eks_access_entry.bedrock_dev_view]
 }
 
 # Note: The EKS module already has enable_cluster_creator_admin_permissions = true

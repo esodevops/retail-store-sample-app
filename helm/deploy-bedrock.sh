@@ -18,39 +18,16 @@ if [[ -f ".env" ]]; then
   set +a
 fi
 
-if [[ ! -f "${GENERATED_VALUES}" ]]; then
-  echo "Missing ${GENERATED_VALUES}. Run ./scripts/sync-retail-secrets.sh first."
-  exit 1
-fi
-
 echo "Configuring AWS credentials for EKS access..."
 
-BEDROCK_ACCESS_KEY=""
-BEDROCK_SECRET_KEY=""
-
-if command -v jq &> /dev/null; then
-  TERRAFORM_STATE=$(terraform -chdir=terraform state show -json module.iam.aws_iam_access_key.dev_view 2>/dev/null || echo "")
-  if [[ -n "${TERRAFORM_STATE:-}" ]]; then
-    BEDROCK_ACCESS_KEY=$(echo "${TERRAFORM_STATE}" | jq -r '.values.access_key // empty' | tr -d '\n')
-    BEDROCK_SECRET_KEY=$(echo "${TERRAFORM_STATE}" | jq -r '.values.secret // empty' | tr -d '\n')
-  fi
-fi
-
-if [[ -z "${BEDROCK_ACCESS_KEY:-}" ]]; then
-  BEDROCK_ACCESS_KEY=$(terraform -chdir=terraform state show module.iam.aws_iam_access_key.dev_view 2>/dev/null | grep -E '^\s*access_key\s*=' | sed 's/.*=\s*"//' | sed 's/"$//' | tr -d '\n' || echo "")
-  BEDROCK_SECRET_KEY=$(terraform -chdir=terraform state show module.iam.aws_iam_access_key.dev_view 2>/dev/null | grep -E '^\s*secret\s*=' | sed 's/.*=\s*"//' | sed 's/"$//' | tr -d '\n' || echo "")
-fi
-
-if [[ -n "${BEDROCK_ACCESS_KEY:-}" ]] && [[ -n "${BEDROCK_SECRET_KEY:-}" ]]; then
-  echo "Using bedrock-dev-view credentials from Terraform state"
-  export AWS_ACCESS_KEY_ID="${BEDROCK_ACCESS_KEY}"
-  export AWS_SECRET_ACCESS_KEY="${BEDROCK_SECRET_KEY}"
-elif [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
   echo "Using AWS credentials from environment variables"
 elif [[ -n "${AWS_PROFILE:-}" ]]; then
   echo "Using AWS profile: ${AWS_PROFILE}"
+elif [[ -n "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" ]] && [[ -n "${AWS_ROLE_ARN:-}" ]]; then
+  echo "Using AWS web identity credentials"
 else
-  echo "WARNING: No credentials found."
+  echo "WARNING: No deployer credentials found. Use an admin/deployer role, not bedrock-dev-view."
   exit 1
 fi
 
@@ -63,6 +40,15 @@ if ! kubectl cluster-info &>/dev/null; then
 fi
 
 kubectl wait --for=condition=ready node --all --timeout=300s
+
+if [[ "${SKIP_SECRET_SYNC:-false}" != "true" ]]; then
+  NAMESPACE="${NAMESPACE}" TERRAFORM_DIR="terraform" ./scripts/sync-retail-secrets.sh
+fi
+
+if [[ ! -f "${GENERATED_VALUES}" ]]; then
+  echo "Missing ${GENERATED_VALUES}. Run ./scripts/sync-retail-secrets.sh first."
+  exit 1
+fi
 
 ALB_ROLE_ARN="$(terraform -chdir=terraform output -raw alb_controller_role_arn)"
 VPC_ID="$(terraform -chdir=terraform output -raw vpc_id)"

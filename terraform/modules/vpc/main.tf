@@ -3,7 +3,7 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.21.0"
 
-  name = var.vpc_name
+  name = var.name_prefix
   cidr = var.vpc_cidr
   azs  = var.vpc_azs
 
@@ -21,29 +21,22 @@ module "vpc" {
   public_subnet_names  = var.public_subnet_names
   private_subnet_names = var.private_subnet_names
 
-  # Unique route table names (one public table per AZ)
-  create_multiple_public_route_tables = true
-  public_route_table_tags = {
-    Name = "bedrock-public-rt"
-  }
-  private_route_table_tags = {
-    Name = "bedrock-private-rt"
-  }
+  public_subnet_suffix  = "public-rt"
+  private_subnet_suffix = "private-rt"
 
-  # Internet gateway, NAT gateway, and EIP naming
+  # A single public route table is shared by both public subnets.
+  create_multiple_public_route_tables = false
+
+  # Internet gateway naming
   igw_tags = {
-    Name = "bedrock-igw"
-  }
-  nat_gateway_tags = {
-    Name = "bedrock-nat-gw"
-  }
-  nat_eip_tags = {
-    Name = "bedrock-nat-eip"
+    Name = "${var.name_prefix}-IGW"
   }
 
-  tags = merge(var.tags, {
+  tags = var.tags
+
+  vpc_tags = {
     Name = var.vpc_name
-  })
+  }
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = "1"

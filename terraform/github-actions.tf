@@ -61,14 +61,14 @@ resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
 resource "aws_eks_access_entry" "github_actions" {
   count = var.cluster_name != "" ? 1 : 0
 
-  cluster_name  = var.cluster_name
+  cluster_name  = module.eks.cluster_name
   principal_arn = aws_iam_role.github_actions_terraform.arn
   type          = "STANDARD"
   user_name     = local.github_actions_role_name_sanitized
   tags          = local.tags
 
   lifecycle {
-    prevent_destroy = false
+    prevent_destroy       = false
     create_before_destroy = true
   }
 }
@@ -77,7 +77,7 @@ resource "aws_eks_access_entry" "github_actions" {
 resource "aws_eks_access_policy_association" "github_actions_admin" {
   count = var.cluster_name != "" ? 1 : 0
 
-  cluster_name  = var.cluster_name
+  cluster_name  = module.eks.cluster_name
   principal_arn = aws_iam_role.github_actions_terraform.arn
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 

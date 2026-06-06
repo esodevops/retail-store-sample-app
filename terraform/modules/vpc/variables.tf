@@ -1,3 +1,4 @@
+variable "name_prefix" { type = string }
 variable "vpc_name" { type = string }
 variable "vpc_cidr" { type = string }
 variable "vpc_azs" { type = list(string) }
@@ -9,10 +10,10 @@ variable "tags" { type = map(string) }
 
 variable "public_subnet_names" {
   type    = list(string)
-  default = ["bedrock-public-sub-1", "bedrock-public-sub-2"]
+  default = ["project-bedrock-public-1", "project-bedrock-public-2"]
 }
 
 variable "private_subnet_names" {
   type    = list(string)
-  default = ["bedrock-private-sub-1", "bedrock-private-sub-2"]
+  default = ["project-bedrock-private-1", "project-bedrock-private-2"]
 }

@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# terraform-import-existing.sh
-# Idempotently imports pre-existing AWS resources into Terraform state.
-# Safe to run on every apply — skips any resource already tracked in state.
 
 set -euo pipefail
 
@@ -163,6 +160,15 @@ if aws iam get-role --role-name "lambda_exec_role" >/dev/null 2>&1; then
   tf_import "module.lambda.aws_iam_role.lambda_exec" "lambda_exec_role"
 fi
 
+# ---------- EKS CloudWatch Log Group ----------
+LOG_GROUP_NAME="/aws/eks/${CLUSTER_NAME}/cluster"
+if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP_NAME" \
+     --region "$REGION" \
+     --query "logGroups[0].logGroupName" \
+     --output text 2>/dev/null | grep -q "$LOG_GROUP_NAME"; then
+  tf_import "module.eks.module.eks.aws_cloudwatch_log_group.this[0]" "$LOG_GROUP_NAME"
+fi
+
 # ---------- Lambda ----------
 if aws lambda get-function --function-name "bedrock-asset-processor" --region "$REGION" >/dev/null 2>&1; then
   tf_import "module.lambda.aws_lambda_function.asset_processor" "bedrock-asset-processor"
@@ -216,7 +222,6 @@ if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" >/dev/null
   fi
 
   # CloudWatch log group should exist before cluster import
-  LOG_GROUP_NAME="/aws/eks/${CLUSTER_NAME}/cluster"
   if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP_NAME" \
        --region "$REGION" \
        --query "logGroups[0].logGroupName" \
