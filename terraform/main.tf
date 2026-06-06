@@ -49,6 +49,7 @@ module "eks" {
   eks_managed_node_groups              = var.eks_managed_node_groups
 }
 
+# Grant access to bedrock-dev-view user (for third-party accessors)
 resource "aws_eks_access_entry" "bedrock_dev_view" {
   cluster_name  = module.eks.cluster_name
   principal_arn = module.iam.user_arn
@@ -60,6 +61,36 @@ resource "aws_eks_access_policy_association" "bedrock_dev_view_policy" {
   cluster_name  = module.eks.cluster_name
   principal_arn = module.iam.user_arn
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+}
+
+# Grant admin access to the deploying user/role (whoever runs terraform apply)
+data "aws_caller_identity" "current" {}
+data "aws_iam_session_context" "current" {
+  arn = data.aws_caller_identity.current.arn
+}
+
+locals {
+  # Get the IAM role ARN if assuming a role, otherwise use the user ARN
+  deployer_principal_arn = try(
+    data.aws_iam_session_context.current.issuer_arn,
+    data.aws_caller_identity.current.arn
+  )
+}
+
+resource "aws_eks_access_entry" "deployer" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = local.deployer_principal_arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "deployer_admin_policy" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = local.deployer_principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
   access_scope {
     type = "cluster"

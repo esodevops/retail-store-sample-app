@@ -95,15 +95,29 @@ variable "cluster_addons" {
 variable "eks_managed_node_groups" {
   type = any
   default = {
-    default = {
-      desired_size   = 2
-      max_size       = 3
-      min_size       = 1
-      instance_types = ["t3.small"]
-      # Use use_name_prefix to give each instance a unique name based on count
+    # Standardized naming: project-bedrock-server-1
+    server-1 = {
+      desired_size    = 2
+      max_size        = 3
+      min_size        = 1
+      instance_types  = ["t3.small"]
       use_name_prefix = true
-      name_prefix     = "project-bedrock-eks-node"
+      name_prefix     = "project-bedrock-server-1"
       tags = {
+        Name    = "project-bedrock-server"
+        Project = "karatu-2025-capstone"
+      }
+    }
+    # Standardized naming: project-bedrock-server-2
+    server-2 = {
+      desired_size    = 2
+      max_size        = 3
+      min_size        = 1
+      instance_types  = ["t3.small"]
+      use_name_prefix = true
+      name_prefix     = "project-bedrock-server-2"
+      tags = {
+        Name    = "project-bedrock-server"
         Project = "karatu-2025-capstone"
       }
     }

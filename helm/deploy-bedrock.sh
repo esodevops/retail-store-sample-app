@@ -77,6 +77,21 @@ fi
 echo "Updating kubeconfig for cluster ${CLUSTER_NAME} in region ${AWS_REGION}..."
 aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
 
+# Test cluster access and add current user if needed
+echo "Testing cluster access..."
+if ! kubectl cluster-info &>/dev/null; then
+    echo "Warning: Cannot access cluster with current credentials."
+    echo "The current IAM user/role needs to be added to the EKS cluster access control."
+    echo ""
+    echo "To fix this, run the following with an admin user:"
+    echo "  aws eks create-access-entry \\"
+    echo "    --cluster-name ${CLUSTER_NAME} \\"
+    echo "    --principal-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):user/$(aws iam get-user --query User.UserName --output text)"
+    echo ""
+    echo "Or use the bedrock-dev-view user credentials from Terraform outputs."
+    exit 1
+fi
+
 CARTS_IRSA_ROLE_ARN="$(terraform -chdir=terraform output -raw carts_irsa_role_arn)"
 
 kubectl apply -f k8s/namespace.yaml
