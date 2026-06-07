@@ -3,7 +3,7 @@ output "cluster_name" { value = module.eks.cluster_name }
 output "region" { value = var.aws_region }
 output "vpc_id" { value = module.vpc.vpc_id }
 output "assets_bucket_name" { value = module.s3.bucket_name }
-output "state_bucket_name" { value = module.state.bucket_name }
+output "state_bucket_name" { value = var.state_bucket_name }
 
 output "catalog_mysql_endpoint" { value = module.data.catalog_mysql_endpoint }
 output "orders_postgres_endpoint" { value = module.data.orders_postgres_endpoint }
