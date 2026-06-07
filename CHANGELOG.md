@@ -1,5 +1,69 @@
 # Changelog
 
+## [1.7.0](https://github.com/esodevops/retail-store-sample-app/compare/v1.6.0...v1.7.0) (2026-06-07)
+
+
+### Features
+
+* add environment-based OIDC trust for GitHub Actions ([cbbd3bb](https://github.com/esodevops/retail-store-sample-app/commit/cbbd3bbcdfe2285ce42a5b34c85b74832e279151))
+* add GitHub Actions workflow for EKS deployment ([12f0d54](https://github.com/esodevops/retail-store-sample-app/commit/12f0d54bba175b22d68a8c6e95109a201d102fd3))
+* apply standardized naming conventions for resources ([10300ec](https://github.com/esodevops/retail-store-sample-app/commit/10300ec48cebad182b0eefaf6b7d3a8ca623f2ff))
+* apply standardized naming conventions for VPC resources ([0f604b5](https://github.com/esodevops/retail-store-sample-app/commit/0f604b528639623aca8b28aee4f4ab58abb156b5))
+* bootstrap OIDC role in Terraform workflow ([16b895c](https://github.com/esodevops/retail-store-sample-app/commit/16b895cbee84c802e78f212408cf17b1979f4132))
+* configure local deployment with .env file for AWS credentials ([9adf291](https://github.com/esodevops/retail-store-sample-app/commit/9adf291ecef4e74c5267caa5741fee844a9ddee0))
+* configure retail-app namespace for all deployment targets ([be9a905](https://github.com/esodevops/retail-store-sample-app/commit/be9a905e867f0e78154ec817df98d50e0343456e))
+* configure retail-app namespace for all deployment targets ([960507b](https://github.com/esodevops/retail-store-sample-app/commit/960507b1ec71ed6fbe0b213564c00a0739fca8c7))
+* create GitHub Actions workflow that enables deploying the retail-app directly from GitHub ([aa7c084](https://github.com/esodevops/retail-store-sample-app/commit/aa7c084454860118a08d89112077b10f08c9e90a))
+* deploy retail store infra ([510fec2](https://github.com/esodevops/retail-store-sample-app/commit/510fec2950fbaf4465c2db5a2558e51262dc5c4d))
+* enable CloudWatch logging permissions for EKS nodes ([470a9c4](https://github.com/esodevops/retail-store-sample-app/commit/470a9c451427c3ee4a4bfaacbcbfcaa66dc953b0))
+* grant EKS cluster admin access to deploying user ([64e7f86](https://github.com/esodevops/retail-store-sample-app/commit/64e7f86a3c13aa22a146a2076ebc46e5e5fa4b6e))
+
+
+### Bug Fixes
+
+* accept role ARN or name and use role.name for IAM policy bindings ([124be98](https://github.com/esodevops/retail-store-sample-app/commit/124be98c9f5ef672ff03ab3470b5be59d075fe38))
+* accept role ARN or name for IAM role inputs ([3e6e8fe](https://github.com/esodevops/retail-store-sample-app/commit/3e6e8fe87134766ac9338d002ebada9b0033070b))
+* Add comprehensive resource imports to handle existing AWS resources ([cb8ed73](https://github.com/esodevops/retail-store-sample-app/commit/cb8ed738686b6bd8acf715629dad7df1deb202b5))
+* add debug step to verify Terraform installation in deploy workflow ([5abd667](https://github.com/esodevops/retail-store-sample-app/commit/5abd667731abe9544be6092d70dd2767d192f435))
+* add EKS cluster access for GitHub Actions role ([d8d9351](https://github.com/esodevops/retail-store-sample-app/commit/d8d935167499c38b7a84f0f7c0d83fd72c012d25))
+* add grading output mode ([070d027](https://github.com/esodevops/retail-store-sample-app/commit/070d027cef45e441321536f00639432c38da2384))
+* add Terraform, kubectl, and Helm setup steps to deploy workflow ([bb96b00](https://github.com/esodevops/retail-store-sample-app/commit/bb96b00107b1216144111845ec9673bf5c0de327))
+* correct ingress resource name in deployment workflow ([b5cda12](https://github.com/esodevops/retail-store-sample-app/commit/b5cda12d756e25b43953db6387a1109a602fe4db))
+* correct the OIDC for already existing role ([80995c2](https://github.com/esodevops/retail-store-sample-app/commit/80995c2fb6325444ccbbe813bf6d4a3e8acc31ed))
+* downgrade the ec2 instance type ([80f4e41](https://github.com/esodevops/retail-store-sample-app/commit/80f4e41fe7a64774b503fe51383c3c93fae23af3))
+* enable force_destroy for S3 state bucket ([8fcb9ed](https://github.com/esodevops/retail-store-sample-app/commit/8fcb9ed543080af9e13ac2da7987ad3a1569f2f2))
+* enable force_destroy for S3 state bucket ([9031dce](https://github.com/esodevops/retail-store-sample-app/commit/9031dce53de5ad7bd318d54e8a2c64ed75a12892))
+* force cleanup EKS access entry before apply ([775c455](https://github.com/esodevops/retail-store-sample-app/commit/775c455e4cdea19863b45de46eed12342f942f6d))
+* import EKS access entries before deploy ([7f73eff](https://github.com/esodevops/retail-store-sample-app/commit/7f73eff406dfa49ea6b116f8b91e337b7d0ac8a7))
+* improve AWS Load Balancer Controller configuration and add debugging ([e8618a3](https://github.com/esodevops/retail-store-sample-app/commit/e8618a3781cc455c546e7c0b7b9a36f84cad6471))
+* improve OIDC provider creation ([29f2c1c](https://github.com/esodevops/retail-store-sample-app/commit/29f2c1cdc3797a9d86be000dccf5c3377892602a))
+* improve OIDC provider creation in setup script ([f1514e8](https://github.com/esodevops/retail-store-sample-app/commit/f1514e89be9c3bb57f7fb92daadcb36d5f1d6717))
+* keep developer console password active ([9125c1a](https://github.com/esodevops/retail-store-sample-app/commit/9125c1a5e797c2e066527a262e3377ed16e23c18))
+* make OIDC provider setup idempotent ([9083458](https://github.com/esodevops/retail-store-sample-app/commit/90834589f66039e252ec31c41db72fe26f5b0152))
+* OIDC bootstrap role resolution ([9ae9996](https://github.com/esodevops/retail-store-sample-app/commit/9ae9996eb864c169bf9b11ade1e1dee54a6802fb))
+* remove redundant deployer EKS access entry ([a7c931f](https://github.com/esodevops/retail-store-sample-app/commit/a7c931fa1df20bef62630cc6c8967ec7b6835643))
+* remove the grading.json from the pipeline ([3a734de](https://github.com/esodevops/retail-store-sample-app/commit/3a734def8fefd7a10d1c110134698ac07843a557))
+* repair OIDC provider bootstrap flow ([9303adb](https://github.com/esodevops/retail-store-sample-app/commit/9303adbf77d89f83dfcb039ca186ca1929261d8a))
+* resolve GitHub Actions OIDC authentication errors ([cb2dbf2](https://github.com/esodevops/retail-store-sample-app/commit/cb2dbf260da8c822387f9163d781410bc621188e))
+* sanitize IAM role names for Terraform resources ([d3452d1](https://github.com/esodevops/retail-store-sample-app/commit/d3452d1466eef9ae6d2d001fd231d75c4750e80e))
+* skip deployer access entry when already exists ([e6b8d60](https://github.com/esodevops/retail-store-sample-app/commit/e6b8d606279344af0814da025460cad90b1be99b))
+* skip deployer access entry when already exists ([e2256b9](https://github.com/esodevops/retail-store-sample-app/commit/e2256b91c93f43012e3c0e989a3be7c61b2e3acc))
+* update cleanup script and the grading.json file from redacted to open file ([6f2523e](https://github.com/esodevops/retail-store-sample-app/commit/6f2523e9594492058758b0b17fa9968530677875))
+* update helm chart and cleanup script ([8cca9f0](https://github.com/esodevops/retail-store-sample-app/commit/8cca9f0bbe3a1ff0bf2d86fe20ce9e1531570291))
+* update helm chart to take any aws profile for deployment ([a9cd4d8](https://github.com/esodevops/retail-store-sample-app/commit/a9cd4d8d39937d8d65659e8c1a0b2c09a65de13d))
+* update helm deployment chart through GitHub Actions ([11e6c98](https://github.com/esodevops/retail-store-sample-app/commit/11e6c983c943822bb0e0bcbdb7c37a56a4cbe2d0))
+* update OIDC configuration to import secret properly ([65c79cb](https://github.com/esodevops/retail-store-sample-app/commit/65c79cbbadce22f7d7b7b3071ee1a94f79f36449))
+* update OIDC setup ([86e0a85](https://github.com/esodevops/retail-store-sample-app/commit/86e0a85877972d0f35de75d6fe4d486d234b9865))
+* update OIDC setup ([f01e9d7](https://github.com/esodevops/retail-store-sample-app/commit/f01e9d7e08337c59529801fc0ef7a028ee763dfb))
+* update terraform and cleanup files ([4dbf5b8](https://github.com/esodevops/retail-store-sample-app/commit/4dbf5b81cb2927054af5a5f0a5d58b9b011648e1))
+* update terraform and cleanup script ([3f48850](https://github.com/esodevops/retail-store-sample-app/commit/3f48850bac835af135462290be17f5d329f8c602))
+* update terraform for resources naming uniqueness ([b76cf13](https://github.com/esodevops/retail-store-sample-app/commit/b76cf13e47f576c7b8ffd9914f338219f2763527))
+* update terraform to resolve naming convention issue ([c488340](https://github.com/esodevops/retail-store-sample-app/commit/c488340f17cb61f0aefd65658a534e912b02b3b3))
+* update the OIDC connection error ([c15a65d](https://github.com/esodevops/retail-store-sample-app/commit/c15a65d52dc497aba52b8cfd62934c94d874ea7a))
+* update the resources naming pattern, terraform and github action ([10ae59f](https://github.com/esodevops/retail-store-sample-app/commit/10ae59f5a6a0fd51974e4d19a1cac205f47404e1))
+* upgrade Terraform to v1.9.0 to resolve expired OpenPGP key error ([751c673](https://github.com/esodevops/retail-store-sample-app/commit/751c67302a6960942fe6eeee3e44cd751dd95e0d))
+* use existing IRSA service account for AWS Load Balancer Controller ([69c1151](https://github.com/esodevops/retail-store-sample-app/commit/69c1151c3aca66ff9a0b07d53f50f856d2e99feb))
+
 ## [1.6.0](https://github.com/esodevops/retail-store-sample-app/compare/v1.5.0...v1.6.0) (2026-06-01)
 
 
