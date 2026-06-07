@@ -16,7 +16,7 @@ jobs:
   bootstrap-oidc:
     runs-on: ubuntu-latest
     outputs:
-      aws_terraform_role_arn: ${{ steps.resolve-role.outputs.aws_terraform_role_arn || steps.bootstrap-role.outputs.aws_terraform_role_arn }}
+      aws_terraform_role_arn: ${{ steps.bootstrap-role.outputs.aws_terraform_role_arn || steps.resolve-role.outputs.aws_terraform_role_arn }}
     env:
       ROLE_NAME: project-bedrock-github-actions-terraform
     steps:
@@ -52,13 +52,13 @@ jobs:
             echo "No existing OIDC role ARN found; bootstrap credentials are required only for first-time OIDC setup."
           fi
       - name: Bootstrap GitHub OIDC
-        if: steps.resolve-role.outputs.aws_terraform_role_arn == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BOOTSTRAP_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BOOTSTRAP_SECRET_ACCESS_KEY }}
           AWS_SESSION_TOKEN: ${{ secrets.AWS_BOOTSTRAP_SESSION_TOKEN }}
           AWS_REGION: us-east-1
           GITHUB_REPOSITORY: ${{ github.repository }}
+          EXISTING_ROLE_ARN: ${{ steps.resolve-role.outputs.aws_terraform_role_arn }}
         run: |
           is_real_value() {
             case "$1" in
@@ -72,6 +72,11 @@ jobs:
           }
 
           if ! is_real_value "${AWS_ACCESS_KEY_ID}" || ! is_real_value "${AWS_SECRET_ACCESS_KEY}"; then
+            if [ -n "${EXISTING_ROLE_ARN}" ]; then
+              echo "Bootstrap AWS credentials not set; using existing AWS_TERRAFORM_ROLE_ARN."
+              exit 0
+            fi
+
             echo "::error::AWS_TERRAFORM_ROLE_ARN is not configured, and real bootstrap access key secrets are not available."
             echo "OIDC removes the need for long-lived AWS keys after the IAM OIDC provider and role already exist."
             echo "For the first run only, either:"
@@ -83,7 +88,6 @@ jobs:
           bash scripts/setup-github-oidc.sh
       - name: Export Bootstrapped Terraform Role ARN
         id: bootstrap-role
-        if: steps.resolve-role.outputs.aws_terraform_role_arn == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BOOTSTRAP_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BOOTSTRAP_SECRET_ACCESS_KEY }}
