@@ -40,8 +40,14 @@ fi
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 echo -e "${GREEN}AWS Account ID: ${ACCOUNT_ID}${NC}"
 
+get_oidc_provider_arn() {
+    aws iam list-open-id-connect-providers \
+        --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn | [0]' \
+        --output text 2>/dev/null | sed 's/^None$//'
+}
+
 # Check if OIDC provider already exists
-OIDC_PROVIDER_ARN=$(aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[?contains(Arn, `token.actions.githubusercontent.com`)].Arn' --output text 2>/dev/null || echo "")
+OIDC_PROVIDER_ARN=$(get_oidc_provider_arn)
 
 if [ -z "$OIDC_PROVIDER_ARN" ]; then
     echo -e "${YELLOW}Creating OIDC provider...${NC}"
@@ -66,10 +72,15 @@ if [ -z "$OIDC_PROVIDER_ARN" ]; then
         --url "https://token.actions.githubusercontent.com" \
         --client-id-list "sts.amazonaws.com" \
         --thumbprint-list "$THUMBPRINT" \
-        --query 'Arn' \
+        --query 'OpenIDConnectProviderArn' \
         --output text 2>&1)
     CREATE_OIDC_EXIT=$?
     set -e
+
+    if [[ $CREATE_OIDC_EXIT -ne 0 ]] && echo "$OIDC_PROVIDER_ARN" | grep -q "EntityAlreadyExists"; then
+        OIDC_PROVIDER_ARN=$(get_oidc_provider_arn)
+        CREATE_OIDC_EXIT=0
+    fi
     
     # Check if the creation was successful
     if [[ $CREATE_OIDC_EXIT -ne 0 ]] || [[ -z "$OIDC_PROVIDER_ARN" ]] || [[ "$OIDC_PROVIDER_ARN" == "None" ]]; then
@@ -86,10 +97,15 @@ if [ -z "$OIDC_PROVIDER_ARN" ]; then
             --url "https://token.actions.githubusercontent.com" \
             --client-id-list "sts.amazonaws.com" \
             --thumbprint-list "$GITHUB_THUMBPRINT" \
-            --query 'Arn' \
+            --query 'OpenIDConnectProviderArn' \
             --output text 2>&1)
         CREATE_OIDC_EXIT=$?
         set -e
+
+        if [[ $CREATE_OIDC_EXIT -ne 0 ]] && echo "$OIDC_PROVIDER_ARN" | grep -q "EntityAlreadyExists"; then
+            OIDC_PROVIDER_ARN=$(get_oidc_provider_arn)
+            CREATE_OIDC_EXIT=0
+        fi
     fi
     
     # Final check
