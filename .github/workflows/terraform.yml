@@ -16,12 +16,43 @@ jobs:
   bootstrap-oidc:
     runs-on: ubuntu-latest
     outputs:
-      aws_terraform_role_arn: ${{ steps.role.outputs.aws_terraform_role_arn }}
+      aws_terraform_role_arn: ${{ steps.resolve-role.outputs.aws_terraform_role_arn || steps.bootstrap-role.outputs.aws_terraform_role_arn }}
     env:
       ROLE_NAME: project-bedrock-github-actions-terraform
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve Existing Terraform Role ARN
+        id: resolve-role
+        env:
+          ROLE_ARN_SECRET: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          ROLE_ARN_VARIABLE: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+        run: |
+          is_real_value() {
+            case "$1" in
+              ""|placeholder|PLACEHOLDER|change-me|CHANGE_ME|changeme|your-role-arn|YOUR_ROLE_ARN)
+                return 1
+                ;;
+              arn:aws:iam::*:role/*)
+                return 0
+                ;;
+              *)
+                return 1
+                ;;
+            esac
+          }
+
+          if is_real_value "${ROLE_ARN_SECRET}"; then
+            echo "aws_terraform_role_arn=${ROLE_ARN_SECRET}" >> "${GITHUB_OUTPUT}"
+            echo "Using AWS_TERRAFORM_ROLE_ARN repository secret."
+          elif is_real_value "${ROLE_ARN_VARIABLE}"; then
+            echo "aws_terraform_role_arn=${ROLE_ARN_VARIABLE}" >> "${GITHUB_OUTPUT}"
+            echo "Using AWS_TERRAFORM_ROLE_ARN repository variable."
+          else
+            echo "aws_terraform_role_arn=" >> "${GITHUB_OUTPUT}"
+            echo "No existing OIDC role ARN found; bootstrap credentials are required only for first-time OIDC setup."
+          fi
       - name: Bootstrap GitHub OIDC
+        if: steps.resolve-role.outputs.aws_terraform_role_arn == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BOOTSTRAP_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BOOTSTRAP_SECRET_ACCESS_KEY }}
@@ -29,22 +60,37 @@ jobs:
           AWS_REGION: us-east-1
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-            echo "AWS_BOOTSTRAP_ACCESS_KEY_ID/AWS_BOOTSTRAP_SECRET_ACCESS_KEY not set; skipping OIDC bootstrap."
-            echo "If OIDC is not already configured, add these repository secrets once or run scripts/setup-github-oidc.sh locally."
-            exit 0
+          is_real_value() {
+            case "$1" in
+              ""|placeholder|PLACEHOLDER|change-me|CHANGE_ME|changeme|your-access-key|your-secret-key|YOUR_ACCESS_KEY|YOUR_SECRET_KEY)
+                return 1
+                ;;
+              *)
+                return 0
+                ;;
+            esac
+          }
+
+          if ! is_real_value "${AWS_ACCESS_KEY_ID}" || ! is_real_value "${AWS_SECRET_ACCESS_KEY}"; then
+            echo "::error::AWS_TERRAFORM_ROLE_ARN is not configured, and real bootstrap access key secrets are not available."
+            echo "OIDC removes the need for long-lived AWS keys after the IAM OIDC provider and role already exist."
+            echo "For the first run only, either:"
+            echo "  1. Add a real AWS_TERRAFORM_ROLE_ARN repository secret/variable for an existing OIDC role, or"
+            echo "  2. Add temporary AWS_BOOTSTRAP_ACCESS_KEY_ID/AWS_BOOTSTRAP_SECRET_ACCESS_KEY secrets to create that role."
+            exit 1
           fi
 
           bash scripts/setup-github-oidc.sh
-      - name: Export Terraform Role ARN
-        id: role
+      - name: Export Bootstrapped Terraform Role ARN
+        id: bootstrap-role
+        if: steps.resolve-role.outputs.aws_terraform_role_arn == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BOOTSTRAP_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BOOTSTRAP_SECRET_ACCESS_KEY }}
           AWS_SESSION_TOKEN: ${{ secrets.AWS_BOOTSTRAP_SESSION_TOKEN }}
           AWS_REGION: us-east-1
         run: |
-          if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+          if ! aws sts get-caller-identity >/dev/null 2>&1; then
             echo "aws_terraform_role_arn=" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
@@ -54,10 +100,10 @@ jobs:
           echo "aws_terraform_role_arn=${ROLE_ARN}" >> "${GITHUB_OUTPUT}"
           echo "Resolved AWS_TERRAFORM_ROLE_ARN=${ROLE_ARN}"
       - name: Update GitHub Secret and Variable
-        if: steps.role.outputs.aws_terraform_role_arn != ''
+        if: steps.bootstrap-role.outputs.aws_terraform_role_arn != ''
         env:
           GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
-          ROLE_ARN: ${{ steps.role.outputs.aws_terraform_role_arn }}
+          ROLE_ARN: ${{ steps.bootstrap-role.outputs.aws_terraform_role_arn }}
         run: |
           if [ -z "${GH_TOKEN}" ]; then
             echo "GH_ADMIN_TOKEN not set; using resolved role ARN for this run only."
