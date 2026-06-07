@@ -15,10 +15,8 @@ on:
         description: 'Version to deploy (e.g., v1.0.0 or latest)'
         required: false
         default: 'latest'
-  push:
-    branches: [main, dev]
   workflow_run:
-    workflows: ["Publish Build"]
+    workflows: ["Terraform"]
     types:
       - completed
 
@@ -34,8 +32,7 @@ jobs:
   deploy:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'dev'))
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/dev' && 'dev' || 'production') }}
@@ -47,7 +44,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             ENV="${{ github.event.inputs.environment }}"
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          elif [[ "${{ github.event.workflow_run.head_branch || github.ref_name }}" == "dev" ]]; then
             ENV="dev"
           else
             ENV="production"
@@ -90,6 +87,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GithubActionsEKSDeploy
+          unset-current-credentials: true
 
       - name: Verify EKS cluster exists
         run: |
