@@ -1,0 +1,102 @@
+{
+  "alb_controller_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::800557027629:role/project-bedrock-cluster-alb-controller"
+  },
+  "assets_bucket_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "bedrock-assets-3765"
+  },
+  "bedrock_dev_view_access_key_id": {
+    "sensitive": true,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "bedrock_dev_view_console_password": {
+    "sensitive": true,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "bedrock_dev_view_secret_access_key": {
+    "sensitive": true,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "carts_irsa_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "catalog_db_password": {
+    "sensitive": true,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "catalog_db_username": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "catalog_mysql_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "cluster_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "project-bedrock-cluster"
+  },
+  "dynamodb_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "retail-carts"
+  },
+  "github_actions_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "github_actions_terraform_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "orders_db_password": {
+    "sensitive": true,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "orders_db_username": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "orders_postgres_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "region": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1"
+  },
+  "state_bucket_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "REDACTED"
+  }
+}
