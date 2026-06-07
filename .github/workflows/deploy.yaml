@@ -91,6 +91,15 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GithubActionsEKSDeploy
 
+      - name: Verify EKS cluster exists
+        run: |
+          set -euo pipefail
+          if ! aws eks describe-cluster --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }} >/dev/null 2>&1; then
+            echo "::error::EKS cluster '${{ env.CLUSTER_NAME }}' does not exist. Run the Terraform workflow successfully before Deploy to EKS."
+            exit 1
+          fi
+          aws eks wait cluster-active --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
