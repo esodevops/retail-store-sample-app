@@ -52,11 +52,6 @@ done
 
 echo "=== Importing existing AWS resources into Terraform state ==="
 
-# ---------- S3 state bucket ----------
-if aws s3api head-bucket --bucket "${NAME_PREFIX}-tfstate-3765" 2>/dev/null; then
-  tf_import "module.state.aws_s3_bucket.tfstate" "${NAME_PREFIX}-tfstate-3765"
-fi
-
 # ---------- DynamoDB ----------
 if aws dynamodb describe-table --table-name "retail-carts" --region "$REGION" >/dev/null 2>&1; then
   tf_import "module.data.aws_dynamodb_table.carts" "retail-carts"
@@ -237,7 +232,11 @@ if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" >/dev/null
     --query 'cluster.identity.oidc.issuer' --output text 2>/dev/null || true)
   if [[ -n "${OIDC_URL:-}" ]] && [[ "${OIDC_URL}" != "None" ]]; then
     OIDC_PROVIDER_NAME=$(echo "$OIDC_URL" | sed 's|https://||' | sed 's|/$||')
-    tf_import "module.eks.module.eks.aws_iam_openid_connect_provider.oidc_provider[0]" "$OIDC_PROVIDER_NAME"
+    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
+    if [[ -n "${ACCOUNT_ID:-}" ]] && [[ "${ACCOUNT_ID}" != "None" ]]; then
+      tf_import "module.eks.module.eks.aws_iam_openid_connect_provider.oidc_provider[0]" \
+        "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER_NAME}"
+    fi
   fi
 fi
 
@@ -265,11 +264,11 @@ if aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" >/dev/null 2>&1; the
       tf_import "aws_eks_access_entry.github_actions[0]" "${CLUSTER_NAME}:${ROLE_ARN}"
 
       ADMIN_POLICY_ARN="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-      ASSOC_IDS=$(aws eks list-access-policy-associations \
+      ASSOC_IDS=$(aws eks list-associated-access-policies \
         --cluster-name "$CLUSTER_NAME" \
         --principal-arn "$ROLE_ARN" \
         --region "$REGION" \
-        --query "accessPolicyAssociations[?policyArn=='${ADMIN_POLICY_ARN}'].associationId" \
+        --query "associatedAccessPolicies[?policyArn=='${ADMIN_POLICY_ARN}'].associationId" \
         --output text 2>/dev/null || true)
       if [[ -n "${ASSOC_IDS:-}" ]] && [[ "${ASSOC_IDS}" != "None" ]]; then
         for ASSOC_ID in $ASSOC_IDS; do
@@ -289,28 +288,17 @@ for addon in $(aws eks list-addons --cluster-name "$CLUSTER_NAME" --region "$REG
   fi
 done
 
-# ---------- EKS Managed Node Groups (terraform-aws-modules/eks v20+) ----------
-# Map AWS node group name prefixes to Terraform module keys in variables.tf
-declare -A NG_KEY_BY_PREFIX=(
-  ["bedrock-server-1"]="server-1"
-  ["bedrock-server-2"]="server-2"
-  ["${NAME_PREFIX}-server-1"]="server-1"
-  ["${NAME_PREFIX}-server-2"]="server-2"
-)
-
 for ng in $(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --region "$REGION" \
      --query 'nodegroups[*]' --output text 2>/dev/null || true); do
   if [[ -z "${ng:-}" ]]; then
     continue
   fi
 
-  ng_key=""
-  for prefix in "${!NG_KEY_BY_PREFIX[@]}"; do
-    if [[ "$ng" == "${prefix}"* ]]; then
-      ng_key="${NG_KEY_BY_PREFIX[$prefix]}"
-      break
-    fi
-  done
+  case "$ng" in
+    bedrock-server-1*|"${NAME_PREFIX}-server-1"*) ng_key="server-1" ;;
+    bedrock-server-2*|"${NAME_PREFIX}-server-2"*) ng_key="server-2" ;;
+    *) ng_key="" ;;
+  esac
 
   if [[ -n "$ng_key" ]]; then
     tf_import "module.eks.module.eks.module.eks_managed_node_group[\"${ng_key}\"].aws_eks_node_group.this[0]" \

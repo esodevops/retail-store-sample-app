@@ -6,10 +6,12 @@ provider "aws" {
   }
 }
 
-module "state" {
-  source      = "./modules/state"
-  bucket_name = var.state_bucket_name
-  tags        = local.tags
+removed {
+  from = module.state
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 module "vpc" {

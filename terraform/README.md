@@ -11,26 +11,34 @@ Provisions all core grading infrastructure in `us-east-1`:
 - Private S3 bucket `bedrock-assets-3765` + Lambda `bedrock-asset-processor` trigger
 - Tag `Project=karatu-2025-capstone` on all resources
 
-## First-time setup (remote state)
+## Remote state bootstrap
 
-The state bucket is defined in the main stack (`module.state`), but the S3 backend cannot exist before the bucket is created. Use a one-time two-step init:
+The S3 backend bucket must exist before Terraform can run `init`, `plan`,
+`apply`, or `destroy`. The bucket is bootstrap infrastructure and is created by
+the helper script instead of being destroyed by the main Terraform stack.
 
 ```sh
-cd terraform
-terraform init -backend=false
-terraform apply -target=module.state
-terraform init -migrate-state
-terraform apply
+../scripts/create-tfstate-bucket.sh
+terraform init -reconfigure
 ```
 
-After that, use normal `terraform init` / `terraform apply`.
+GitHub Actions runs this bootstrap helper before `terraform init`.
 
-## Deploy infrastructure (subsequent runs)
+## Deploy infrastructure
 
 ```sh
 cd terraform
 terraform init
 terraform apply
+```
+
+## Destroy infrastructure
+
+Use the destroy helper from the repository root. It recreates the backend bucket
+first if it was deleted, then initializes Terraform and runs destroy.
+
+```sh
+scripts/terraform-destroy.sh
 ```
 
 ## Required outputs
