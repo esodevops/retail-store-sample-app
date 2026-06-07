@@ -129,6 +129,7 @@ jobs:
         with:
           role-to-assume: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: us-east-1
+          unset-current-credentials: true
         env:
           AWS_TERRAFORM_ROLE_ARN: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
       - name: Ensure Terraform State Bucket Exists
@@ -172,6 +173,7 @@ jobs:
         with:
           role-to-assume: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: us-east-1
+          unset-current-credentials: true
         env:
           AWS_TERRAFORM_ROLE_ARN: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
       - name: Ensure Terraform State Bucket Exists
@@ -183,6 +185,12 @@ jobs:
         env:
           AWS_TERRAFORM_ROLE_ARN: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
         run: bash scripts/terraform-import-existing.sh
+      - name: Remove Pre-existing GitHub EKS Access Entry
+        env:
+          AWS_TERRAFORM_ROLE_ARN: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
+          PRINCIPAL_ARN: ${{ needs.bootstrap-oidc.outputs.aws_terraform_role_arn || secrets.AWS_TERRAFORM_ROLE_ARN }}
+          FORCE_DELETE: "true"
+        run: bash scripts/cleanup-eks-access-entry.sh
       - name: Terraform Validate
         working-directory: terraform
         run: terraform validate
