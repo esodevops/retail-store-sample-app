@@ -264,16 +264,15 @@ if aws iam get-role --role-name "$GITHUB_ACTIONS_ROLE_NAME" >/dev/null 2>&1; the
       tf_import "aws_eks_access_entry.github_actions[0]" "${CLUSTER_NAME}:${ROLE_ARN}"
 
       ADMIN_POLICY_ARN="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-      ASSOC_IDS=$(aws eks list-associated-access-policies \
+      ASSOCIATED_ADMIN_POLICY=$(aws eks list-associated-access-policies \
         --cluster-name "$CLUSTER_NAME" \
         --principal-arn "$ROLE_ARN" \
         --region "$REGION" \
-        --query "associatedAccessPolicies[?policyArn=='${ADMIN_POLICY_ARN}'].associationId" \
+        --query "associatedAccessPolicies[?policyArn=='${ADMIN_POLICY_ARN}'].policyArn | [0]" \
         --output text 2>/dev/null || true)
-      if [[ -n "${ASSOC_IDS:-}" ]] && [[ "${ASSOC_IDS}" != "None" ]]; then
-        for ASSOC_ID in $ASSOC_IDS; do
-          tf_import "aws_eks_access_policy_association.github_actions_admin[0]" "${CLUSTER_NAME}/${ROLE_ARN}_${ASSOC_ID}"
-        done
+      if [[ -n "${ASSOCIATED_ADMIN_POLICY:-}" ]] && [[ "${ASSOCIATED_ADMIN_POLICY}" != "None" ]]; then
+        tf_import "aws_eks_access_policy_association.github_actions_admin[0]" \
+          "${CLUSTER_NAME}#${ROLE_ARN}#${ADMIN_POLICY_ARN}"
       fi
     fi
   fi

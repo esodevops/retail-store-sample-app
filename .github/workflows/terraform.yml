@@ -187,13 +187,23 @@ jobs:
         working-directory: terraform
         run: terraform validate
       - name: Terraform Apply
+        id: terraform-apply
         working-directory: terraform
         run: terraform apply -auto-approve
+      - name: Verify EKS Cluster Exists
+        if: success()
+        run: |
+          set -euo pipefail
+          aws eks wait cluster-active --region us-east-1 --name project-bedrock-cluster
+          aws eks describe-cluster --region us-east-1 --name project-bedrock-cluster >/dev/null
       - name: Setup Helm
+        if: success()
         uses: azure/setup-helm@v4
       - name: Setup kubectl
+        if: success()
         uses: azure/setup-kubectl@v4
       - name: Deploy Retail Store App
+        if: success()
         run: bash helm/deploy-bedrock.sh
       - name: Generate Grading JSON
         run: bash scripts/generate-grading-json.sh

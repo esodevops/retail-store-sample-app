@@ -32,6 +32,11 @@ else
 fi
 
 echo "Updating kubeconfig for cluster ${CLUSTER_NAME} in region ${AWS_REGION}..."
+if ! aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+  echo "ERROR: EKS cluster ${CLUSTER_NAME} does not exist. Run terraform apply successfully before deploying."
+  exit 1
+fi
+aws eks wait cluster-active --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
 aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
 
 if ! kubectl cluster-info &>/dev/null; then
