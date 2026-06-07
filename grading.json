@@ -12,12 +12,12 @@
   "bedrock_dev_view_access_key_id": {
     "sensitive": true,
     "type": "string",
-    "value": "AKIA3UZHK2EWZLGX7437"
+    "value": "REDACTED"
   },
   "bedrock_dev_view_console_password": {
     "sensitive": true,
     "type": "string",
-    "value": "D2)NEgygpKD8w_0ystV2"
+    "value": "REDACTED"
   },
   "bedrock_dev_view_secret_access_key": {
     "sensitive": true,
