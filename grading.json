@@ -22,7 +22,7 @@
   "bedrock_dev_view_secret_access_key": {
     "sensitive": true,
     "type": "string",
-    "value": "mJaXx5D6j7h6eb91VRK1XrxkjFcO3+oOzvVZKdDZ"
+    "value": "REDACTED"
   },
   "carts_irsa_role_arn": {
     "sensitive": false,
