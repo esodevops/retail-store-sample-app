@@ -27,27 +27,27 @@
   "carts_irsa_role_arn": {
     "sensitive": false,
     "type": "string",
-    "value": "arn:aws:iam::800557027629:role/project-bedrock-carts-irsa"
+    "value": "REDACTED"
   },
   "catalog_db_password": {
     "sensitive": true,
     "type": "string",
-    "value": "RGj08eVvInOBGxVI"
+    "value": "REDACTED"
   },
   "catalog_db_username": {
     "sensitive": false,
     "type": "string",
-    "value": "catalog"
+    "value": "REDACTED"
   },
   "catalog_mysql_endpoint": {
     "sensitive": false,
     "type": "string",
-    "value": "project-bedrock-catalog-mysql.cczq4m6sy4gb.us-east-1.rds.amazonaws.com:3306"
+    "value": "REDACTED"
   },
   "cluster_endpoint": {
     "sensitive": false,
     "type": "string",
-    "value": "https://C98CABFD5EFC040206B2206BC7B9A10D.gr7.us-east-1.eks.amazonaws.com"
+    "value": "REDACTED"
   },
   "cluster_name": {
     "sensitive": false,
@@ -62,27 +62,27 @@
   "github_actions_role_arn": {
     "sensitive": false,
     "type": "string",
-    "value": "arn:aws:iam::800557027629:role/project-bedrock-github-actions-terraform"
+    "value": "REDACTED"
   },
   "github_actions_terraform_role_arn": {
     "sensitive": false,
     "type": "string",
-    "value": "arn:aws:iam::800557027629:role/project-bedrock-github-actions-terraform"
+    "value": "REDACTED"
   },
   "orders_db_password": {
     "sensitive": true,
     "type": "string",
-    "value": "OVGuK8EkU7Qh4oPF"
+    "value": "REDACTED"
   },
   "orders_db_username": {
     "sensitive": false,
     "type": "string",
-    "value": "orders"
+    "value": "REDACTED"
   },
   "orders_postgres_endpoint": {
     "sensitive": false,
     "type": "string",
-    "value": "project-bedrock-orders-postgres.cczq4m6sy4gb.us-east-1.rds.amazonaws.com:5432"
+    "value": "REDACTED"
   },
   "region": {
     "sensitive": false,
@@ -92,11 +92,11 @@
   "state_bucket_name": {
     "sensitive": false,
     "type": "string",
-    "value": "project-bedrock-tfstate-3765"
+    "value": "REDACTED"
   },
   "vpc_id": {
     "sensitive": false,
     "type": "string",
-    "value": "vpc-0ff7becf2bd90018d"
+    "value": "REDACTED"
   }
 }
