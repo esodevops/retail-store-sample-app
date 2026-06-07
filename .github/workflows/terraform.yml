@@ -8,7 +8,7 @@ on:
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
   pull-requests: write
   actions: write
 
@@ -215,15 +215,9 @@ jobs:
         run: bash helm/deploy-bedrock.sh
       - name: Generate Grading JSON
         run: bash scripts/generate-grading-json.sh
-      - name: Commit Grading JSON
-        if: github.event_name == 'push'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add grading.json
-          if git diff --cached --quiet; then
-            echo "grading.json unchanged"
-          else
-            git commit -m "Update grading output [skip ci]"
-            git push
-          fi
+      - name: Upload Grading JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: grading-json
+          path: grading.json
+          if-no-files-found: error
