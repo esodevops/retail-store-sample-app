@@ -61,7 +61,8 @@ terraform init -backend-config="bucket=project-bedrock-tfstate-3765" \
 
 # Check if resource is already in state
 echo -e "${YELLOW}Checking Terraform state...${NC}"
-RESOURCE_IN_STATE=$(terraform state list 2>/dev/null | grep -E "^aws_eks_access_entry\.github_actions\[" || echo "")
+ACCESS_ENTRY_ADDRESS='module.eks.module.eks.aws_eks_access_entry.this["cluster_creator"]'
+RESOURCE_IN_STATE=$(terraform state show "$ACCESS_ENTRY_ADDRESS" 2>/dev/null || echo "")
 
 if [ -n "$RESOURCE_IN_STATE" ]; then
     echo -e "${GREEN}Resource is already in Terraform state: $RESOURCE_IN_STATE${NC}"
@@ -74,7 +75,7 @@ echo -e "${YELLOW}Importing EKS Access Entry into Terraform state...${NC}"
 IMPORT_ID="${CLUSTER_NAME}:${ROLE_ARN}"
 echo "Import ID: $IMPORT_ID"
 
-terraform import 'aws_eks_access_entry.github_actions[0]' "$IMPORT_ID"
+terraform import "$ACCESS_ENTRY_ADDRESS" "$IMPORT_ID"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Successfully imported EKS Access Entry!${NC}"
@@ -89,21 +90,22 @@ fi
 echo -e "${YELLOW}Checking EKS Access Policy Association...${NC}"
 POLICY_ARN="arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
-POLICY_IN_STATE=$(terraform state list 2>/dev/null | grep -E "^aws_eks_access_policy_association\.github_actions_admin\[" || echo "")
+POLICY_ADDRESS='module.eks.module.eks.aws_eks_access_policy_association.this["cluster_creator_admin"]'
+POLICY_IN_STATE=$(terraform state show "$POLICY_ADDRESS" 2>/dev/null || echo "")
 
 if [ -z "$POLICY_IN_STATE" ]; then
     # Check if the policy association exists
-    EXISTING_ASSOCIATION=$(aws eks list-access-policy-associations \
+    EXISTING_ASSOCIATION=$(aws eks list-associated-access-policies \
         --cluster-name "$CLUSTER_NAME" \
         --principal-arn "$ROLE_ARN" \
         --region "$REGION" \
-        --query "accessPolicyAssociations[?policyArn=='$POLICY_ARN'].associationId" \
+        --query "associatedAccessPolicies[?policyArn=='$POLICY_ARN'].policyArn | [0]" \
         --output text 2>/dev/null || echo "")
     
     if [ -n "$EXISTING_ASSOCIATION" ] && [[ "$EXISTING_ASSOCIATION" != "None" ]]; then
         echo -e "${YELLOW}Importing EKS Access Policy Association...${NC}"
-        IMPORT_ID="${CLUSTER_NAME}/${ROLE_ARN}_${EXISTING_ASSOCIATION}"
-        terraform import 'aws_eks_access_policy_association.github_actions_admin[0]' "$IMPORT_ID"
+        IMPORT_ID="${CLUSTER_NAME}#${ROLE_ARN}#${POLICY_ARN}"
+        terraform import "$POLICY_ADDRESS" "$IMPORT_ID"
         echo -e "${GREEN}Successfully imported EKS Access Policy Association!${NC}"
     fi
 fi

@@ -64,27 +64,20 @@ resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
   policy_arn = var.github_actions_role_policy_arn
 }
 
-# Grant the GitHub Actions role access to the EKS cluster
-resource "aws_eks_access_entry" "github_actions" {
-  count = var.cluster_name != "" ? 1 : 0
+# The EKS module owns this role's cluster-creator entry and admin association.
+# Forget the former duplicate addresses without deleting their shared AWS objects.
+removed {
+  from = aws_eks_access_entry.github_actions
 
-  cluster_name  = module.eks.cluster_name
-  principal_arn = aws_iam_role.github_actions_terraform.arn
-  type          = "STANDARD"
-  tags          = local.tags
+  lifecycle {
+    destroy = false
+  }
 }
 
-# Grant cluster-admin permissions to the GitHub Actions role
-resource "aws_eks_access_policy_association" "github_actions_admin" {
-  count = var.cluster_name != "" ? 1 : 0
+removed {
+  from = aws_eks_access_policy_association.github_actions_admin
 
-  cluster_name  = module.eks.cluster_name
-  principal_arn = aws_iam_role.github_actions_terraform.arn
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-
-  access_scope {
-    type = "cluster"
+  lifecycle {
+    destroy = false
   }
-
-  depends_on = [aws_eks_access_entry.github_actions]
 }
