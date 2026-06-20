@@ -850,15 +850,17 @@ fi
 
 set +e
 if [[ "$RUN_TERRAFORM_DESTROY" == "true" ]]; then
-	TF_DESTROY_OUTPUT=$(terraform -chdir="$ROOT_DIR/terraform" destroy -auto-approve 2>&1)
-	TF_DESTROY_EXIT=$?
+	TF_DESTROY_LOG=$(mktemp)
+	terraform -chdir="$ROOT_DIR/terraform" destroy -auto-approve 2>&1 | tee "$TF_DESTROY_LOG"
+	TF_DESTROY_EXIT=${PIPESTATUS[0]}
+	TF_DESTROY_OUTPUT=$(<"$TF_DESTROY_LOG")
+	rm -f "$TF_DESTROY_LOG"
 else
 	TF_DESTROY_OUTPUT="Terraform destroy skipped because fallback cleanup already ran."
 	TF_DESTROY_EXIT=0
+	echo "$TF_DESTROY_OUTPUT"
 fi
 set -e
-
-echo "$TF_DESTROY_OUTPUT"
 
 if [[ $TF_DESTROY_EXIT -ne 0 ]] && echo "$TF_DESTROY_OUTPUT" | grep -Eq 'Unable to access object.*terraform.tfstate.*(Forbidden|NoSuchBucket|AccessDenied)|S3 bucket ".*" does not exist|NoSuchBucket'; then
 	echo
